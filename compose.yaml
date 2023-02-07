@@ -1,0 +1,26 @@
+services:
+        nginx:
+                image: nginx
+                container_name: gateway
+                links:
+                        - primary_manager
+                        - readonly_manager_1
+                volumes:
+                        - ./nginx/conf:/etc/nginx/conf.d/
+                ports:
+                        - 8080:80
+        
+        primary_manager:
+                image: connectify/primary_manager
+                container_name: primary
+                hostname: primary
+
+        readonly_manager_1:
+                image: connectify/readonly_manager
+                container_name: readonly_1
+                hostname: readonly_1
+
+        broker_1:
+                image: connectify/broker
+                container_name: broker_1
+                hostname: broker_1
