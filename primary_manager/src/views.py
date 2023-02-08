@@ -28,7 +28,7 @@ def bad_request(error):
     ignore_for=["GET"],
 )
 def topics():
-    """Return all the topics or add a topic."""
+    """Add a topic."""
 
     # If method is POST add a topic
     if request.method == "POST":
@@ -76,16 +76,47 @@ def register_producer():
     try:
         producer_id,partition_count = data_manager.add_producer(topic_name)
         return make_response(
-            jsonify({"status": "success", "producer_id": producer_id, "partition_count":partition_count}),
+            jsonify({
+                "status": "success", 
+                "producer_id": producer_id, 
+                "partition_count":partition_count}),
             200,
         )
     except Exception as e:
         return make_response(
             jsonify({"status": "failure", "message": str(e)}), 400
         )
+
 @app.route(rule="/consumer/register", methods=["POST"])
-def consume():
-    return "POST on /consumer/register"
+@expects_json(
+    {
+        "type": "object",
+        "properties": {"topic": {"type": "string"}},
+        "required": ["topic"],
+    }
+)
+def register_consumer():
+    """Register a consumer for a topic."""
+    topic_name = request.get_json()["topic"]
+
+    try:
+        consumer_id,partition_count = data_manager.add_consumer(topic_name)
+        broker_hosts = data_manager.get_broker_list_for_topic(topic_name)
+        for broker_host in broker_hosts: # can async this
+            response = requests.post("http://"+broker_host+":5000/consumer/register",json = {"topic":topic_name,"consumer_id":consumer_id})
+        # SEND THE REQUEST TO THE READ ONLY MANAGERS FOR SYNC!
+        return make_response(
+            jsonify({
+                "status": "success", 
+                "consumer_id": consumer_id, 
+                "partition_count":partition_count}),
+            200,
+        )
+    except Exception as e:
+        return make_response(
+            jsonify({"status": "failure", "message": str(e)}), 400
+        )
+
 
 @app.route(rule="/producer/produce", methods=["POST"])
 @expects_json(
@@ -111,7 +142,12 @@ def produce():
             partition_number = request.get_json()["partition_number"]
         
         broker_host = data_manager.get_broker_host(topic_name, producer_id, partition_number)
-        response =  requests.post("http://"+broker_host+":5000/producer/produce",json = {"topic":topic_name, "producer_id":producer_id,"message":message})
+        response =  requests.post(
+            "http://"+broker_host+":5000/producer/produce",
+            json = {
+                "topic":topic_name, 
+                "producer_id":producer_id,
+                "message":message})
         return make_response(
             jsonify({"status": "success"}),
             200,

@@ -65,27 +65,26 @@ def topics():
         )
 
 
-# @app.route(rule="/consumer/register", methods=["POST"])
-# @expects_json(
-#     {
-#         "type": "object",
-#         "properties": {"topic": {"type": "string"}},
-#         "required": ["topic"],
-#     }
-# )
-# def register_consumer():
-#     """Register a consumer for a topic."""
-#     topic_name = request.get_json()["topic"]
-#     try:
-#         consumer_id = master_queue.add_consumer(topic_name)
-#         return make_response(
-#             jsonify({"status": "success", "consumer_id": consumer_id}),
-#             200,
-#         )
-#     except Exception as e:
-#         return make_response(
-#             jsonify({"status": "failure", "message": str(e)}), 400
-#         )
+@app.route(rule="/consumer/register", methods=["POST"])
+@expects_json(
+    {
+        "type": "object",
+        "properties": {"topic": {"type": "string"}, "consumer_id":{"type":"string"}},
+        "required": ["topic","consumer_id"],
+    }
+)
+def register_consumer():
+    """Register a consumer for a topic."""
+    topic_name = request.get_json()["topic"]
+    consumer_id = request.get_json()["consumer_id"]
+    try:
+        master_queue.add_consumer(topic_name,consumer_id)
+        return make_response(
+            jsonify({"status": "success"}),
+            200,
+        )
+    except Exception as e:
+        raise
 
 
 # @app.route(rule="/producer/register", methods=["POST"])

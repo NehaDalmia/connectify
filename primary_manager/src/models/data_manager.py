@@ -6,7 +6,7 @@ import requests
 
 from src.models import Topic
 from src import db
-from src import TopicDB, BrokerDB, ProducerDB, PartitionDB
+from src import TopicDB, BrokerDB, ProducerDB, PartitionDB, ConsumerDB
 
 class DataManager:
     """
@@ -18,6 +18,7 @@ class DataManager:
         self._topics: Dict[str, Topic] = {}
         self._brokers: Dict[str, int] = {}
 
+
     def init_from_db(self) -> None:
         """Initialize the manager from the db."""
         topics = TopicDB.query.all()
@@ -27,6 +28,10 @@ class DataManager:
             producers = ProducerDB.query.filter_by(topic_name=topic.name).all()
             for producer in producers:
                 self._topics[topic.name].add_producer(producer.id)
+            consumers = ConsumerDB.query.filter_by(topic_name=topic.name).all()
+            for consumer in consumers:
+                self._topics[topic.name].add_consumer(consumer.id)
+    
         brokers = BrokerDB.query.all()
         for broker in brokers:
             self._brokers[broker.name] = 0
@@ -66,7 +71,7 @@ class DataManager:
             db.session.commit()
 
     def add_producer(self, topic_name: str) -> List[str]:
-        """Add a producer to the topic and return its id."""
+        """Add a producer to the topic and return its id and #partitions"""
         if not self._contains(topic_name):
             try: 
                 requests.post("http://primary:5000/topics",json = {"name":topic_name})
@@ -80,6 +85,19 @@ class DataManager:
         db.session.commit()
 
         return [producer_id, self._topics[topic_name].get_partition_count()]
+    
+    def add_consumer(self, topic_name: str) -> List[str]:
+        """Add a consumer to the topic and return its id and #partitions"""
+        if not self._contains(topic_name):
+            raise Exception("Topic does not exist.")
+        consumer_id = str(uuid.uuid4().hex)
+        self._topics[topic_name].add_consumer(consumer_id)
+
+        # add to db
+        db.session.add(ConsumerDB(id=consumer_id, topic_name=topic_name))
+        db.session.commit()
+
+        return [consumer_id, self._topics[topic_name].get_partition_count()]
     
     def get_broker_host(self, topic_name: str, producer_id: str, partition_number : int = None) -> str:
         """Add a log to the topic if producer is registered with topic."""
@@ -95,6 +113,9 @@ class DataManager:
             if self._topics[topic_name].get_partition_count() <= partition_number :
                 raise Exception("Invalid Partition Number.")
             return  self._topics[topic_name].update_partition_index(producer_id, partition_number)
+    
+    def get_broker_list_for_topic(self, topic_name:str) -> List[str]:
+        return self._topics[topic_name].get_broker_list()
         
        
     

@@ -23,11 +23,11 @@ class MasterQueue:
         for topic in topics:
             self._topics[topic.name] = Topic(topic.name)
             # get consumers with topic_name=topic.name
-            # consumers = ConsumerDB.query.filter_by(topic_name=topic.name).all()
-            # for consumer in consumers:
-            #     self._topics[topic.name].add_consumer(
-            #         consumer.id, consumer.offset
-            #     )
+            consumers = ConsumerDB.query.filter_by(topic_name=topic.name).all()
+            for consumer in consumers:
+                self._topics[topic.name].add_consumer(
+                    consumer.id, consumer.offset
+                )
             # get producers with topic_name=topic.name
             # producers = ProducerDB.query.filter_by(topic_name=topic.name).all()
             # for producer in producers:
@@ -43,21 +43,19 @@ class MasterQueue:
                     Log(log.producer_id, log.message, log.timestamp)
                 )
 
-    # def _contains(self, topic_name: str) -> bool:
-    #     """Return whether the master queue contains the given topic."""
-    #     with self._lock:
-    #         return topic_name in self._topics
+    def _contains(self, topic_name: str) -> bool:
+        """Return whether the master queue contains the given topic."""
+        with self._lock:
+            return topic_name in self._topics
 
-    # def check_and_add_topic(self, topic_name: str) -> None:
-    #     """Add a topic to the master queue."""
-    #     with self._lock:
-    #         if topic_name in self._topics:
-    #             raise Exception("Topic already exists.")
-    #         self._topics[topic_name] = Topic(topic_name)
+    def check_and_add_topic(self, topic_name: str) -> None:
+        """Add a topic to the master queue."""
+        with self._lock:
+            self._topics[topic_name] = Topic(topic_name)
 
-    #     # add to db
-    #     db.session.add(TopicDB(name=topic_name))
-    #     db.session.commit()
+        # add to db
+        db.session.add(TopicDB(name=topic_name))
+        db.session.commit()
 
     def get_size(self, topic_name: str, consumer_id: str) -> int:
         """Return the number of log messages in the requested topic for
@@ -121,30 +119,11 @@ class MasterQueue:
         with self._lock:
             return list(self._topics.keys())
 
-    # def add_consumer(self, topic_name: str) -> str:
-    #     """Add a consumer to the topic and return its id."""
-    #     if not self._contains(topic_name):
-    #         raise Exception("Topic does not exist.")
-    #     consumer_id = str(uuid.uuid4().hex)
-    #     self._topics[topic_name].add_consumer(consumer_id)
-
-    #     # add to db
-    #     db.session.add(
-    #         ConsumerDB(id=consumer_id, topic_name=topic_name, offset=0)
-    #     )
-    #     db.session.commit()
-
-    #     return consumer_id
-
-    # def add_producer(self, topic_name: str) -> str:
-    #     """Add a producer to the topic and return its id."""
-    #     if not self._contains(topic_name):
-    #         raise Exception("Topic does not exist.")
-    #     producer_id = str(uuid.uuid4().hex)
-    #     self._topics[topic_name].add_producer(producer_id)
-
-    #     # add to db
-    #     db.session.add(ProducerDB(id=producer_id, topic_name=topic_name))
-    #     db.session.commit()
-
-    #     return producer_id
+    def add_consumer(self, topic_name: str, consumer_id: str) -> None:
+        """Add a consumer to the topic"""
+        self._topics[topic_name].add_consumer(consumer_id)
+        # add to db
+        db.session.add(
+            ConsumerDB(id=consumer_id, topic_name=topic_name, offset=0)
+        )
+        db.session.commit()
