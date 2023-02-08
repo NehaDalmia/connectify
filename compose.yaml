@@ -11,6 +11,7 @@ services:
         deploy:
         networks:       
             - internal
+    
     # PRIMARY MANAGER
     primary_manager:
         image: connectify/primary_manager
@@ -19,6 +20,9 @@ services:
         deploy:
         networks:       
             - internal
+        entrypoint: python3
+        command: app.py
+
     # READ ONLY MANAGERS
     readonly_manager:
         image: connectify/readonly_manager
@@ -27,6 +31,9 @@ services:
             replicas: 3
         networks:       
             - internal
+        entrypoint: python3
+        command: app.py
+
     # BROKERS
      
     #     Template to add new broker 
@@ -40,6 +47,8 @@ services:
         image: connectify/broker
         build: ./broker
         container_name: broker-1
+        volumes:
+            - ./broker/:/app/
         networks:       
             - internal
         restart: always
@@ -47,6 +56,8 @@ services:
             - masterdb-1
         environment:
             - DB_NAME=masterdb-1
+        entrypoint: python3
+        command: app.py
 
     broker-2: 
         image: connectify/broker
@@ -59,6 +70,8 @@ services:
             - masterdb-2
         environment:
             - DB_NAME=masterdb-2
+        entrypoint: python3
+        command: app.py
 
         
     # MASTER DATABASES
