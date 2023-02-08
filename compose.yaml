@@ -10,7 +10,7 @@ services:
             - 8080:80
         deploy:
         networks:       
-            - connectify_internal
+            - internal
     # PRIMARY MANAGER
     primary_manager:
         image: connectify/primary_manager
@@ -18,7 +18,7 @@ services:
         container_name: primary
         deploy:
         networks:       
-            - connectify_internal
+            - internal
     # READ ONLY MANAGERS
     readonly_manager:
         image: connectify/readonly_manager
@@ -26,7 +26,7 @@ services:
         deploy:
             replicas: 3
         networks:       
-            - connectify_internal
+            - internal
     # BROKERS
      
     #     Template to add new broker 
@@ -34,27 +34,31 @@ services:
     #         image : connectify/broker
     #         build : ./broker
     #         container_name : broker-<id>
-    #         networks : connectify_internal
+    #         networks : internal
     
     broker-1:
         image: connectify/broker
         build: ./broker
         container_name: broker-1
         networks:       
-            - connectify_internal
+            - internal
         restart: always
         depends_on:
             - masterdb-1
+        environment:
+            - DB_NAME=masterdb-1
 
     broker-2: 
         image: connectify/broker
         build: ./broker
         container_name: broker-2
         networks:       
-            - connectify_internal
+            - internal
         restart: always
         depends_on:
-            - masterdb-1
+            - masterdb-2
+        environment:
+            - DB_NAME=masterdb-2
 
         
     # MASTER DATABASES
@@ -70,7 +74,7 @@ services:
                 - 'POSTGRES_PASSWORD=postgres'
                 - 'POSTGRES_DB=masterdb-1'
         networks:       
-            - connectify_internal
+            - internal
         
     masterdb-2:
         image: postgres:13
@@ -83,7 +87,7 @@ services:
                 - 'POSTGRES_PASSWORD=postgres'
                 - 'POSTGRES_DB=masterdb-2'
         networks:       
-            - connectify_internal
+            - internal
         
         # postgres:
         #         image: postgres:13
@@ -116,4 +120,4 @@ services:
         #                 - 'POSTGRES_DB=slave_database'
 
 networks:
-    connectify_internal: {}
+    internal: {}
