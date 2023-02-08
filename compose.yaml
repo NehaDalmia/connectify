@@ -10,7 +10,8 @@ services:
             - 8080:80
         deploy:
         networks:       
-            - connectify_internal
+            - internal
+    
     # PRIMARY MANAGER
     primary_manager:
         image: connectify/primary_manager
@@ -19,7 +20,10 @@ services:
         hostname: primary
         deploy:
         networks:       
-            - connectify_internal
+            - internal
+        entrypoint: python3
+        command: app.py
+
     # READ ONLY MANAGERS
     readonly_manager:
         image: connectify/readonly_manager
@@ -27,7 +31,10 @@ services:
         deploy:
             replicas: 1
         networks:       
-            - connectify_internal
+            - internal
+        entrypoint: python3
+        command: app.py
+
     # BROKERS
      
     #     Template to add new broker 
@@ -35,18 +42,24 @@ services:
     #         image : connectify/broker
     #         build : ./broker
     #         container_name : broker-<id>
-    #         networks : connectify_internal
+    #         networks : internal
     
     broker-1:
         image: connectify/broker
         build: ./broker
         container_name: broker-1
+        volumes:
+            - ./broker/:/app/
         networks:       
-            - connectify_internal
+            - internal
         restart: always
         hostname: broker-1
         depends_on:
             - masterdb-1
+        environment:
+            - DB_NAME=masterdb-1
+        entrypoint: python3
+        command: app.py
         environment:
             - DB_NAME=masterdb-1
 
@@ -55,11 +68,15 @@ services:
         build: ./broker
         container_name: broker-2
         networks:       
-            - connectify_internal
+            - internal
         restart: always
         hostname: broker-2
         depends_on:
-            - masterdb-1
+            - masterdb-2
+        environment:
+            - DB_NAME=masterdb-2
+        entrypoint: python3
+        command: app.py
         environment:
             - DB_NAME=masterdb-2
     
@@ -103,7 +120,7 @@ services:
                 - 'POSTGRES_PASSWORD=postgres'
                 - 'POSTGRES_DB=masterdb-1'
         networks:       
-            - connectify_internal
+            - internal
         
     masterdb-2:
         image: postgres:13
@@ -161,4 +178,4 @@ services:
         #                 - 'POSTGRES_DB=slave_database'
 
 networks:
-    connectify_internal: {}
+    internal: {}

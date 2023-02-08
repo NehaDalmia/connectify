@@ -6,7 +6,7 @@ import config
 import os
 
 app = Flask(__name__)
-app.config.from_object(config.DevConfig)
+app.config.from_object(config.ProdConfig)
 
 db = SQLAlchemy(app)
 from db_models import *
