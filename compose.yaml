@@ -1,26 +1,119 @@
+version: "3.0"
 services:
-        nginx:
-                image: nginx
-                container_name: gateway
-                links:
-                        - primary_manager
-                        - readonly_manager_1
-                volumes:
-                        - ./nginx/conf:/etc/nginx/conf.d/
-                ports:
-                        - 8080:80
+    # LOAD BALANCER
+    gateway:
+        image: nginx
+        container_name: gateway
+        volumes:
+            - ./nginx/conf:/etc/nginx/conf.d/
+        ports:
+            - 8080:80
+        deploy:
+        networks:       
+            - connectify_internal
+    # PRIMARY MANAGER
+    primary_manager:
+        image: connectify/primary_manager
+        build: ./primary_manager
+        container_name: primary
+        deploy:
+        networks:       
+            - connectify_internal
+    # READ ONLY MANAGERS
+    readonly_manager:
+        image: connectify/readonly_manager
+        build: ./readonly_manager
+        deploy:
+            replicas: 3
+        networks:       
+            - connectify_internal
+    # BROKERS
+     
+    #     Template to add new broker 
+    #     broker-<id>:
+    #         image : connectify/broker
+    #         build : ./broker
+    #         container_name : broker-<id>
+    #         networks : connectify_internal
+    
+    broker-1:
+        image: connectify/broker
+        build: ./broker
+        container_name: broker-1
+        networks:       
+            - connectify_internal
+        restart: always
+        depends_on:
+            - masterdb-1
+
+    broker-2: 
+        image: connectify/broker
+        build: ./broker
+        container_name: broker-2
+        networks:       
+            - connectify_internal
+        restart: always
+        depends_on:
+            - masterdb-1
+
         
-        primary_manager:
-                image: connectify/primary_manager
-                container_name: primary
-                hostname: primary
+    # MASTER DATABASES
 
-        readonly_manager_1:
-                image: connectify/readonly_manager
-                container_name: readonly_1
-                hostname: readonly_1
+    masterdb-1:
+        image: postgres:13
+        container_name: masterdb-1
+        restart: always
+        volumes:
+                - ./database_volumes/masterdb1_data:/var/lib/postgresql/data
+        hostname: masterdb-1
+        environment:
+                - 'POSTGRES_PASSWORD=postgres'
+                - 'POSTGRES_DB=masterdb-1'
+        networks:       
+            - connectify_internal
+        
+    masterdb-2:
+        image: postgres:13
+        container_name: masterdb-2
+        restart: always
+        volumes:
+                - ./database_volumes/masterdb2_data:/var/lib/postgresql/data
+        hostname: masterdb-2
+        environment:
+                - 'POSTGRES_PASSWORD=postgres'
+                - 'POSTGRES_DB=masterdb-2'
+        networks:       
+            - connectify_internal
+        
+        # postgres:
+        #         image: postgres:13
+        #         container_name: master_db
+        #         restart: always
+        #         volumes:
+        #                 - ./data:/var/lib/postgresql/data
+        #                 - ./master_confs/my-postgres.conf:/var/lib/postgresql/data/postgresql.conf
+        #                 - ./master_confs/my-pg_hba.conf:/var/lib/postgresql/data/pg_hba.conf
+        #         hostname: master_db
+        #         ports:
+        #                 - 5432:5432
+        #         environment:
+        #                 - 'POSTGRES_PASSWORD=postgres'
+        #                 - 'POSTGRES_DB=master_database'
 
-        broker_1:
-                image: connectify/broker
-                container_name: broker_1
-                hostname: broker_1
+        # postgres_slave: 
+        #         image: postgres:13
+        #         container_name: slave_db
+        #         restart: always
+        #         volumes:
+        #                 - ./data-slave:/var/lib/postgresql/data
+        #                 - ./my-postgres.conf:/var/lib/postgresql/data/postgresql.conf
+        #                 - ./my-pg_hba.conf:/var/lib/postgresql/data/pg_hba.conf
+        #         hostname: slave_db_1
+        #         ports:
+        #                 - 5433:5432
+        #         environment:
+        #                 - 'POSTGRES_PASSWORD=postgres'
+        #                 - 'POSTGRES_DB=slave_database'
+
+networks:
+    connectify_internal: {}
