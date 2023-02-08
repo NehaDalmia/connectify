@@ -6,7 +6,7 @@ import config
 import os
 
 app = Flask(__name__)
-app.config.from_object(config.ProdConfig)
+app.config.from_object(config.DevConfig)
 db = SQLAlchemy(app)
 from db_models import *
 
@@ -34,11 +34,11 @@ with app.app_context():
     if app.config["FLASK_ENV"] == "development":
         print("Topics in master queue:")
         print(master_queue._topics.keys())
-        for topic_name in master_queue._topics:
-            print(topic_name)
-            print("Logs in topic %s:" % topic_name)
-            print(master_queue._topics[topic_name]._logs)
-            print("Consumers in topic %s:" % topic_name)
-            print(master_queue._topics[topic_name]._consumers)
-            print("Producers in topic %s:" % topic_name)
-            print(master_queue._topics[topic_name]._producers)
+        # for topic_name in master_queue._topics:
+        #     print(topic_name)
+        #     print("Logs in topic %s:" % topic_name)
+        #     print(master_queue._topics[topic_name]._logs)
+        #     print("Consumers in topic %s:" % topic_name)
+        #     print(master_queue._topics[topic_name]._consumers)
+        #     print("Producers in topic %s:" % topic_name)
+        #     print(master_queue._topics[topic_name]._producers)

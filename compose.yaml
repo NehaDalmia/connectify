@@ -16,6 +16,7 @@ services:
         image: connectify/primary_manager
         build: ./primary_manager
         container_name: primary
+        hostname: primary
         deploy:
         networks:       
             - connectify_internal
@@ -24,7 +25,7 @@ services:
         image: connectify/readonly_manager
         build: ./readonly_manager
         deploy:
-            replicas: 3
+            replicas: 1
         networks:       
             - connectify_internal
     # BROKERS
@@ -43,8 +44,11 @@ services:
         networks:       
             - connectify_internal
         restart: always
+        hostname: broker-1
         depends_on:
             - masterdb-1
+        environment:
+            - DB_NAME=masterdb-1
 
     broker-2: 
         image: connectify/broker
@@ -53,10 +57,39 @@ services:
         networks:       
             - connectify_internal
         restart: always
+        hostname: broker-2
         depends_on:
             - masterdb-1
+        environment:
+            - DB_NAME=masterdb-2
+    
+    broker-3: 
+        image: connectify/broker
+        build: ./broker
+        container_name: broker-3
+        networks:       
+            - connectify_internal
+        restart: always
+        hostname: broker-3
+        depends_on:
+            - masterdb-3
+        environment:
+            - DB_NAME=masterdb-3
 
-        
+    # PRIME_MANAGER DATA DB 
+
+    prime_datadb: 
+        image: postgres:13
+        container_name: prime_datadb
+        restart: always
+        volumes:
+                - ./database_volumes/prime_datadb_data:/var/lib/postgresql/data
+        hostname: prime_datadb
+        environment:
+                - 'POSTGRES_PASSWORD=postgres'
+                - 'POSTGRES_DB=prime_datadb'
+        networks:       
+            - connectify_internal
     # MASTER DATABASES
 
     masterdb-1:
@@ -82,6 +115,18 @@ services:
         environment:
                 - 'POSTGRES_PASSWORD=postgres'
                 - 'POSTGRES_DB=masterdb-2'
+        networks:       
+            - connectify_internal
+    masterdb-3:
+        image: postgres:13
+        container_name: masterdb-3
+        restart: always
+        volumes:
+                - ./database_volumes/masterdb3_data:/var/lib/postgresql/data
+        hostname: masterdb-3
+        environment:
+                - 'POSTGRES_PASSWORD=postgres'
+                - 'POSTGRES_DB=masterdb-3'
         networks:       
             - connectify_internal
         

@@ -98,11 +98,7 @@ class MasterQueue:
         return self._topics[topic_name].get_log(index_to_fetch)
 
     def add_log(self, topic_name: str, producer_id: str, message: str) -> None:
-        """Add a log to the topic if producer is registered with topic."""
-        if not self._contains(topic_name):
-            raise Exception("Topic does not exist.")
-        if not self._topics[topic_name].check_producer(producer_id):
-            raise Exception("Producer not registered with topic.")
+        """Add a log to the topic"""
         timestamp = time.time()
         index = self._topics[topic_name].add_log(
             Log(producer_id, message, timestamp)

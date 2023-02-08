@@ -51,9 +51,7 @@ def topics():
                 200,
             )
         except Exception as e:
-            return make_response(
-                jsonify({"status": "failure", "message": str(e)}), 400
-            )
+            raise
 
     # If method is GET return all the topics
     try:
@@ -108,9 +106,7 @@ def register_producer():
             200,
         )
     except Exception as e:
-        return make_response(
-            jsonify({"status": "failure", "message": str(e)}), 400
-        )
+        raise
 
 
 @app.route(rule="/producer/produce", methods=["POST"])
@@ -137,9 +133,7 @@ def produce():
             200,
         )
     except Exception as e:
-        return make_response(
-            jsonify({"status": "failure", "message": str(e)}), 400
-        )
+        raise
 
 
 @app.route(rule="/consumer/consume", methods=["GET"])
