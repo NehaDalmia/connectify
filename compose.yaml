@@ -60,8 +60,6 @@ services:
             - DB_NAME=masterdb-1
         entrypoint: python3
         command: app.py
-        environment:
-            - DB_NAME=masterdb-1
 
     broker-2: 
         image: connectify/broker
@@ -77,15 +75,13 @@ services:
             - DB_NAME=masterdb-2
         entrypoint: python3
         command: app.py
-        environment:
-            - DB_NAME=masterdb-2
     
     broker-3: 
         image: connectify/broker
         build: ./broker
         container_name: broker-3
         networks:       
-            - connectify_internal
+            - internal
         restart: always
         hostname: broker-3
         depends_on:
@@ -106,7 +102,7 @@ services:
                 - 'POSTGRES_PASSWORD=postgres'
                 - 'POSTGRES_DB=prime_datadb'
         networks:       
-            - connectify_internal
+            - internal
     # MASTER DATABASES
 
     masterdb-1:
@@ -133,7 +129,7 @@ services:
                 - 'POSTGRES_PASSWORD=postgres'
                 - 'POSTGRES_DB=masterdb-2'
         networks:       
-            - connectify_internal
+            - internal
     masterdb-3:
         image: postgres:13
         container_name: masterdb-3
@@ -145,7 +141,7 @@ services:
                 - 'POSTGRES_PASSWORD=postgres'
                 - 'POSTGRES_DB=masterdb-3'
         networks:       
-            - connectify_internal
+            - internal
         
         # postgres:
         #         image: postgres:13
