@@ -48,7 +48,7 @@ class Topic:
 
     def append_broker(self, broker_host:str) -> None:
         """Append broker host name to list of brokers"""
-        self._broker_list.append(broker_host)
+        self._broker_list.append(broker_host)  # not added thread safety, is it needed?
 
     def get_partition_count(self) -> int:
         return self._partitions

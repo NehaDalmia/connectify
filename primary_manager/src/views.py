@@ -37,15 +37,11 @@ def topics():
             broker_hosts = []
             # add default none arg to data manager funcs
             if "number_of_partitions" in request.get_json():
-                broker_hosts = data_manager.check_and_get_chosen_brokers(topic_name,request.get_json()["number_of_partitions"])
+                broker_hosts = data_manager.add_topic_and_return(topic_name,request.get_json()["number_of_partitions"])
             else : 
-                broker_hosts = data_manager.check_and_get_chosen_brokers(topic_name)
+                broker_hosts = data_manager.add_topic_and_return(topic_name)
             for broker_host in broker_hosts: # can async this
                 response = requests.post("http://"+broker_host+":5000/topics",json = {"name":topic_name})
-            if "number_of_partitions" in request.get_json():
-                data_manager.add_topic(topic_name,broker_hosts,request.get_json()["number_of_partitions"])
-            else : 
-                data_manager.add_topic(topic_name,broker_hosts)
             
             
             return make_response(
@@ -74,6 +70,8 @@ def register_producer():
     """Register a producer for a topic."""
     topic_name = request.get_json()["topic"]
     try:
+        if not data_manager._contains(topic_name):
+            requests.post("http://primary:5000/topics",json = {"name":topic_name}) 
         producer_id,partition_count = data_manager.add_producer(topic_name)
         return make_response(
             jsonify({

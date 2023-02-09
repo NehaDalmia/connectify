@@ -47,7 +47,7 @@ class DataManager:
         with self._lock:
             return topic_name in self._topics
     
-    def check_and_get_chosen_brokers(self, topic_name: str, num_partitions: int = 2) -> List[str]:
+    def add_topic_and_return(self, topic_name: str, num_partitions: int = 2) -> List[str]:
         broker_hosts = []
         # choosing partition with minimum number of brokers
         with self._lock:
@@ -59,24 +59,16 @@ class DataManager:
                 self._brokers[min_partition_broker]+=1
                 broker_hosts.append(min_partition_broker)
                 self._topics[topic_name].append_broker(broker_hosts[i])
-        return broker_hosts
-
-    def add_topic(self, topic_name: str, broker_hosts: List[str], num_partitions: int = 2) -> None:
-        """Add a topic to the master queue."""
-        # add to db
-        db.session.add(TopicDB(name=topic_name, partitions = num_partitions))
-        db.session.commit()
-        for index in range(num_partitions) : 
-            db.session.add(PartitionDB(ind=index,topic_name = topic_name, broker_host = broker_hosts[index]))
+            # add to db --> CONFIRM WITH NIS
+            db.session.add(TopicDB(name=topic_name, partitions = num_partitions))
             db.session.commit()
-
+            for index in range(num_partitions) : 
+                db.session.add(PartitionDB(ind=index,topic_name = topic_name, broker_host = broker_hosts[index]))
+                db.session.commit()
+        return broker_hosts
+        
     def add_producer(self, topic_name: str) -> List[str]:
         """Add a producer to the topic and return its id and #partitions"""
-        if not self._contains(topic_name):
-            try: 
-                requests.post("http://primary:5000/topics",json = {"name":topic_name})
-            except Exception as e:
-                raise
         producer_id = str(uuid.uuid4().hex)
         self._topics[topic_name].add_producer(producer_id)
 
