@@ -12,7 +12,7 @@ MESSAGES = 100
 counters = [[0 for _ in range(10)] for _ in range(10)]
 
 def prod(i):
-    k = 107 # vary for different topic name
+    k = 119 # vary for different topic name
     response = requests.post(
         "http://172.19.0.1:8080/topics", json={"name": f"test_topic_r{k}"}
     )

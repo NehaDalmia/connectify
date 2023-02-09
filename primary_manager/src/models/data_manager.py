@@ -49,7 +49,7 @@ class DataManager:
     
     def add_topic_and_return(self, topic_name: str, num_partitions: int = 2) -> List[str]:
         broker_hosts = []
-        # choosing partition with minimum number of brokers
+        # choosing [partition] with minimum number of brokers
         with self._lock:
             if topic_name in self._topics:
                 raise Exception("Topic already exists.")
