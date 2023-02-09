@@ -12,24 +12,14 @@ MESSAGES = 100
 counters = [[0 for _ in range(10)] for _ in range(10)]
 
 def prod(i):
-    k = 107
-    response = requests.post(
-        "http://172.19.0.1:8080/topics", json={"name": f"test_topic_r{k}"}
-    )
-    if response.status_code != 200:
-        print(response.json()["message"])
-    else : 
-        print(f"producer {i} created topic")
-    # assert response.status_code == 200
-    # assert response.json()["status"] == "success"
+    k = 107 # vary for different topic name
     response = requests.post(
         "http://172.19.0.1:8080/producer/register",
         json={"topic": f"test_topic_r{k}"},
     )
     if response.status_code != 200:
         print(response.json()["message"])
-        # print(f"error at producer{i}")
-    # assert response.status_code == 200
+    assert response.status_code == 200
     producer_id = response.json()["producer_id"]
     list1 = [0,1]
     for cnt in range(MESSAGES):
