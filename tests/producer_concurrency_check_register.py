@@ -3,12 +3,6 @@ import random
 
 MESSAGES = 100
 
-# response = requests.post(
-#     "http://172.19.0.1:8080/topics", json={"name": "test_topic_n"}
-# )
-# assert response.status_code == 200
-# assert response.json()["status"] == "success"
-
 counters = [[0 for _ in range(10)] for _ in range(10)]
 
 def prod(i):
