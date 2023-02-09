@@ -26,7 +26,8 @@ services:
             - internal
         entrypoint: python3
         command: app.py
-        depends_on: prime_datadb
+        depends_on: 
+            - prime_datadb
 
     # READ ONLY MANAGERS
     readonly_manager:
@@ -38,7 +39,8 @@ services:
             - internal
         entrypoint: python3
         command: app.py
-        depends_on: primary_manager
+        depends_on: 
+            - primary_manager
 
     # BROKERS
      
