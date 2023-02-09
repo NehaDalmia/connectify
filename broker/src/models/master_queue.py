@@ -29,9 +29,9 @@ class MasterQueue:
                     consumer.id, consumer.offset
                 )
             # get producers with topic_name=topic.name
-            producers = ProducerDB.query.filter_by(topic_name=topic.name).all()
-            for producer in producers:
-                self._topics[topic.name].add_producer(producer.id)
+            # producers = ProducerDB.query.filter_by(topic_name=topic.name).all()
+            # for producer in producers:
+            #     self._topics[topic.name].add_producer(producer.id)
             # get logs with topic_name=topic.name and ordered by their ids
             logs = (
                 LogDB.query.filter_by(topic_name=topic.name)
@@ -51,8 +51,6 @@ class MasterQueue:
     def check_and_add_topic(self, topic_name: str) -> None:
         """Add a topic to the master queue."""
         with self._lock:
-            if topic_name in self._topics:
-                raise Exception("Topic already exists.")
             self._topics[topic_name] = Topic(topic_name)
 
         # add to db
@@ -98,11 +96,7 @@ class MasterQueue:
         return self._topics[topic_name].get_log(index_to_fetch)
 
     def add_log(self, topic_name: str, producer_id: str, message: str) -> None:
-        """Add a log to the topic if producer is registered with topic."""
-        if not self._contains(topic_name):
-            raise Exception("Topic does not exist.")
-        if not self._topics[topic_name].check_producer(producer_id):
-            raise Exception("Producer not registered with topic.")
+        """Add a log to the topic"""
         timestamp = time.time()
         index = self._topics[topic_name].add_log(
             Log(producer_id, message, timestamp)
@@ -125,30 +119,11 @@ class MasterQueue:
         with self._lock:
             return list(self._topics.keys())
 
-    def add_consumer(self, topic_name: str) -> str:
-        """Add a consumer to the topic and return its id."""
-        if not self._contains(topic_name):
-            raise Exception("Topic does not exist.")
-        consumer_id = str(uuid.uuid4().hex)
+    def add_consumer(self, topic_name: str, consumer_id: str) -> None:
+        """Add a consumer to the topic"""
         self._topics[topic_name].add_consumer(consumer_id)
-
         # add to db
         db.session.add(
             ConsumerDB(id=consumer_id, topic_name=topic_name, offset=0)
         )
         db.session.commit()
-
-        return consumer_id
-
-    def add_producer(self, topic_name: str) -> str:
-        """Add a producer to the topic and return its id."""
-        if not self._contains(topic_name):
-            raise Exception("Topic does not exist.")
-        producer_id = str(uuid.uuid4().hex)
-        self._topics[topic_name].add_producer(producer_id)
-
-        # add to db
-        db.session.add(ProducerDB(id=producer_id, topic_name=topic_name))
-        db.session.commit()
-
-        return producer_id

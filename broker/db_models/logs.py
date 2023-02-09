@@ -11,7 +11,7 @@ class Log(db.Model):
         primary_key=True,
     )
     producer_id = db.Column(
-        db.String(32), db.ForeignKey("producer.id"), nullable=False
+        db.String(32),nullable=False
     )
     message = db.Column(db.String(256), nullable=False)
     timestamp = db.Column(db.Float, nullable=False)
