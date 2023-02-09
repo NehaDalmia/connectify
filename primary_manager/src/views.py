@@ -148,7 +148,6 @@ def produce():
                 "message":message,
                 "partition_index":partition_number})
         
-        # todo return properly
         return make_response( 
             jsonify({"status": "success"}),
             200,

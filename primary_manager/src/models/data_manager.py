@@ -59,7 +59,6 @@ class DataManager:
                 self._brokers[min_partition_broker]+=1
                 broker_hosts.append(min_partition_broker)
                 self._topics[topic_name].append_broker(broker_hosts[i])
-            # add to db --> CONFIRM WITH NIS
             db.session.add(TopicDB(name=topic_name, partitions = num_partitions))
             db.session.commit()
             for index in range(num_partitions) : 
