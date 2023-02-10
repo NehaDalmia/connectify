@@ -49,7 +49,7 @@ class DataManager:
     
     def add_topic_and_return(self, topic_name: str, num_partitions: int = 2) -> List[str]:
         broker_hosts = []
-        # choosing partition with minimum number of brokers
+        # choosing [partition] with minimum number of brokers
         with self._lock:
             if topic_name in self._topics:
                 raise Exception("Topic already exists.")
@@ -59,7 +59,6 @@ class DataManager:
                 self._brokers[min_partition_broker]+=1
                 broker_hosts.append(min_partition_broker)
                 self._topics[topic_name].append_broker(broker_hosts[i])
-            # add to db --> CONFIRM WITH NIS
             db.session.add(TopicDB(name=topic_name, partitions = num_partitions))
             db.session.commit()
             for index in range(num_partitions) : 

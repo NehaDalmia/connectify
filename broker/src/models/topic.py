@@ -13,8 +13,9 @@ class Topic:
     A topic is a collection of log messages that are related to each other.
     """
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, partition_index: int):
         self._name = name
+        self._partition_index = partition_index
         self._logs = ThreadSafeLogQueue()
         self._producers = ThreadSafeProducerSet()
         self._consumers = ThreadSafeConsumerDict()

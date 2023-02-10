@@ -38,10 +38,10 @@ def topics():
             # add default none arg to data manager funcs
             if "number_of_partitions" in request.get_json():
                 broker_hosts = data_manager.add_topic_and_return(topic_name,request.get_json()["number_of_partitions"])
-            else : 
+            else: 
                 broker_hosts = data_manager.add_topic_and_return(topic_name)
-            for broker_host in broker_hosts: # can async this
-                response = requests.post("http://"+broker_host+":5000/topics",json = {"name":topic_name})
+            for i in range(len(broker_hosts)):
+                response = requests.post("http://"+broker_hosts[i]+":5000/topics",json = {"name":topic_name,"partition_index":i})                
             
             
             return make_response(
@@ -100,8 +100,8 @@ def register_consumer():
     try:
         consumer_id,partition_count = data_manager.add_consumer(topic_name)
         broker_hosts = data_manager.get_broker_list_for_topic(topic_name)
-        for broker_host in broker_hosts: # can async this
-            response = requests.post("http://"+broker_host+":5000/consumer/register",json = {"topic":topic_name,"consumer_id":consumer_id})
+        for i in range(len(broker_hosts)): # can async this
+            response = requests.post("http://"+broker_hosts[i]+":5000/consumer/register",json = {"topic":topic_name,"consumer_id":consumer_id,"partition_index":i})
         # SEND THE REQUEST TO THE READ ONLY MANAGERS FOR SYNC!
         return make_response(
             jsonify({
@@ -145,8 +145,10 @@ def produce():
             json = {
                 "topic":topic_name, 
                 "producer_id":producer_id,
-                "message":message})
-        return make_response(
+                "message":message,
+                "partition_index":partition_number})
+        
+        return make_response( 
             jsonify({"status": "success"}),
             200,
         )

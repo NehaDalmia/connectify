@@ -29,7 +29,7 @@ def index():
     {
         "type": "object",
         "properties": {"name": {"type": "string"}},
-        "required": ["name"],
+        "required": ["name","partition_index"],
     },
     ignore_for=["GET"],
 )
@@ -39,8 +39,9 @@ def topics():
     # If method is POST add a topic
     if request.method == "POST":
         topic_name = request.get_json()["name"]
+        partition_index = request.get_json()["partition_index"]
         try:
-            master_queue.check_and_add_topic(topic_name)
+            master_queue.check_and_add_topic(topic_name, partition_index)
             return make_response(
                 jsonify(
                     {
@@ -69,16 +70,17 @@ def topics():
 @expects_json(
     {
         "type": "object",
-        "properties": {"topic": {"type": "string"}, "consumer_id":{"type":"string"}},
-        "required": ["topic","consumer_id"],
+        "properties": {"topic": {"type": "string"}, "consumer_id":{"type":"string"},"partition_index":{"type":"number"}},
+        "required": ["topic","consumer_id","partition_index"],
     }
 )
 def register_consumer():
     """Register a consumer for a topic."""
     topic_name = request.get_json()["topic"]
     consumer_id = request.get_json()["consumer_id"]
+    partition_index = request.get_json()["partition_index"]
     try:
-        master_queue.add_consumer(topic_name,consumer_id)
+        master_queue.add_consumer(topic_name,partition_index,consumer_id)
         return make_response(
             jsonify({"status": "success"}),
             200,
@@ -116,8 +118,9 @@ def register_consumer():
             "topic": {"type": "string"},
             "producer_id": {"type": "string"},
             "message": {"type": "string"},
+            "partition_index":{"type":"number"}
         },
-        "required": ["topic", "producer_id", "message"],
+        "required": ["topic", "producer_id", "message","partition_index"],
     }
 )
 def produce():
@@ -125,8 +128,9 @@ def produce():
     topic_name = request.get_json()["topic"]
     producer_id = request.get_json()["producer_id"]
     message = request.get_json()["message"]
+    partition_index = request.get_json()["partition_index"]
     try:
-        master_queue.add_log(topic_name, producer_id, message)
+        master_queue.add_log(topic_name, partition_index,producer_id, message)
         return make_response(
             jsonify({"status": "success"}),
             200,
@@ -146,7 +150,7 @@ def produce():
         "required": ["topic", "consumer_id"],
     }
 )
-def consume():
+def consume(): #partition_index add
     """Consume a log from a topic."""
     topic_name = request.get_json()["topic"]
     consumer_id = request.get_json()["consumer_id"]
