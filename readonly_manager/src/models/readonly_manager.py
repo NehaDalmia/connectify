@@ -1,5 +1,5 @@
 import threading
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from datetime import datetime
 import random
 
@@ -14,11 +14,11 @@ class ReadonlyManager:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._broker_count = 0
-        self._round_robin_turn_counter = 0
-        self._round_robin_seed = random.seed(datetime.now().microsecond)
-        self._brokers_by_topic_and_ptn: Dict[(str, int), Broker]
-        self._topics: Dict[str, Topic]
-        self._brokers: List[Broker]
+        # self._round_robin_turn_counter = 0
+        # self._round_robin_seed = random.seed(datetime.now().microsecond)
+        self._brokers_by_topic_and_ptn: Dict[(str, int), Broker] = {}
+        self._topics: Dict[str, Topic] = {}
+        self._brokers: List[Broker] = []
 
     def init_from_db(self) -> None:
         """
@@ -29,16 +29,17 @@ class ReadonlyManager:
         self._broker_count = BrokerDB.query.count()
         # DD: We apply a round-robin policy on the assignment of brokers for serving read
         # requests. This way we balance load across brokers when consumer traffic is high
-        self._round_robin_turn_counter = 0
+        # self._round_robin_turn_counter = 0
         for i in range(self._broker_count):
-            self._brokers[i] = Broker(i+1)
+            self._brokers.append(Broker(i+1))
         
-        # Initialize the round robin turns of the brokers in a random order
-        # DD: Reduces the chance of several readonly managers running R.R. in the same order
-        # thus helping in better load balancing
-        order_of_brokers = random.shuffle(list(range(self._broker_count)))
-        for i in range(self._broker_count):
-            self._brokers[i].set_last_requested(order_of_brokers[i])
+        # # Initialize the round robin turns of the brokers in a random order
+        # # DD: Reduces the chance of several readonly managers running R.R. in the same order
+        # # thus helping in better load balancing
+        # order_of_brokers = list(range(self._broker_count))
+        # random.shuffle(order_of_brokers)
+        # for i in range(self._broker_count):
+        #     self._brokers[i].set_last_requested(order_of_brokers[i])
 
         topics = TopicDB.query.all()
         for topic in topics:
@@ -64,33 +65,40 @@ class ReadonlyManager:
         """
         return self._brokers_by_topic_and_ptn[(topic_name, partition_number)].get_name()
 
-    def find_best_broker(self, topic_name: str) -> str:
+    # def find_best_broker(self, topic_name: str) -> str:
+    #     """
+    #     Given topic name, find a broker handling that topic. Use round-robin policy
+    #     to assign a broker. Return the corresponding broker hostname.
+    #     """
+    #     best_broker_number = -1
+    #     with self._lock:
+    #         min_turn = self._broker_count
+    #         # Among the subset of brokers that contain partitions of the topic passed, find the one
+    #         # that got it's turn the earliest, reassign 
+    #         for partition_idx in range(self._topics[topic_name].get_partition_count()):
+    #             broker_number = self.get_broker(topic_name, partition_idx).get_number()
+    #             broker_last_turn = self._brokers[broker_number-1].get_last_requested()
+    #             adjusted_turn = (broker_last_turn - self._round_robin_turn_counter + self._broker_count) % self._broker_count
+    #             if adjusted_turn < min_turn :
+    #                 min_turn = adjusted_turn
+    #                 best_broker_number = broker_number
+    #         self._brokers[best_broker_number-1].set_last_requested(self._round_robin_turn_counter)
+    #         self.round_robin_turn_counter_increment()
+        
+    #     return self._brokers[best_broker_number-1].get_name()
+
+    def find_best_partition(self, topic_name: str, consumer_id: str) -> Tuple[int,str]:
         """
         Given topic name, find a broker handling that topic. Use round-robin policy
         to assign a broker. Return the corresponding broker hostname.
         """
-        best_broker_number = -1
-        with self._lock:
-            min_turn = self._broker_count
-            # Among the subset of brokers that contain partitions of the topic passed, find the one
-            # that got it's turn the earliest, reassign 
-            for partition_idx in range(self._topics[topic_name].get_partition_count()):
-                broker_number = self.get_broker(topic_name, partition_idx).get_number()
-                broker_last_turn = self._brokers[broker_number-1].get_last_requested()
-                adjusted_turn = broker_last_turn - self._round_robin_turn_counter + self._broker_count
-                if adjusted_turn < min_turn :
-                    min_turn = adjusted_turn
-                    best_broker_number = broker_number
-            self._brokers[best_broker_number-1].set_last_requested(self._round_robin_turn_counter)
-            self.round_robin_turn_counter_increment()
-        
-        return str(Broker(best_broker_number))
+        return self._topics[topic_name].get_and_increment_next_partition(consumer_id)
 
-    def round_robin_turn_counter_increment(self) -> None:
-        """
-        Increment the round robin turn counter by 1 modulo number of brokers
-        """
-        self._round_robin_turn_counter = (self._round_robin_turn_counter + 1) % self._broker_count
+    # def round_robin_turn_counter_increment(self) -> None:
+    #     """
+    #     Increment the round robin turn counter by 1 modulo number of brokers
+    #     """
+    #     self._round_robin_turn_counter = (self._round_robin_turn_counter + 1) % self._broker_count
 
     def get_topics(self) -> List[str]:
         """Return the topic names."""
@@ -100,35 +108,26 @@ class ReadonlyManager:
         """Check if topic exists."""
         return topic_name in self._topics.keys()
 
+    def get_broker_count(self) -> int:
+        """Return the number of brokers."""
+        return self._broker_count
+
+    def get_partition_count(self, topic_name: str) -> int:
+        """Return the number of partitions in a given topic."""
+        return self._topics[topic_name].get_partition_count()
+    
     def is_registered(self, consumer_id: str, topic_name: str) -> bool:
         """Check if consumer is registered to topic"""
-        return self._topics[topic_name].contains()
+        return self._topics[topic_name].contains(consumer_id)
     
-    def assign_size_request(self, topic_name: str, consumer_id: str) -> str:
+    def is_request_valid(self, topic_name: str, consumer_id: str, partition_number: int = None) -> str:
         """
-        Handle an incoming size request. Perform sanity checks (is topic present, 
-        is consumer registered to this topic). Return a broker to handle this request.
+        Perform sanity checks (is topic present, is partition number valid, is consumer registered to this topic).
         """
         if not self.has_topic(topic_name):
             raise Exception("Topic does not exist.")
-        if not self.is_registered(consumer_id, topic_name):
-            raise Exception("Consumer not registered with topic.")
-        
-        return self.find_best_broker(topic_name)
-    
-    def assign_consume_request(self, topic_name: str, consumer_id: str, partition_number: int = None) -> str:
-        """
-        Handle an incoming consume request. Perform sanity checks (is topic present, 
-        is consumer registered to this topic). Return a broker to handle this request.
-        """
-        if not self.has_topic(topic_name):
-            raise Exception("Topic does not exist.")
-        if not self.is_registered(consumer_id, topic_name):
-            raise Exception("Consumer not registered with topic.")
-        
         if partition_number is not None:
-            return self.get_broker_host(topic_name, partition_number)
-        else:
-            return self.find_best_broker(topic_name)
-            # (as we handle only one partition of a given topic in a given broker, not needed)
-            # partition_number = self.find_best_partition(broker_host, topic_name)
+            if partition_number >= self._topics[topic_name].get_partition_count() or partition_number < 0:
+                raise Exception("Invalid partition number.")
+        if not self.is_registered(consumer_id, topic_name):
+            raise Exception("Consumer not registered with topic.")

@@ -146,16 +146,18 @@ def produce():
         "properties": {
             "topic": {"type": "string"},
             "consumer_id": {"type": "string"},
+            "partition_number": {"type": "number"}
         },
-        "required": ["topic", "consumer_id"],
+        "required": ["topic", "consumer_id", "partition_number"],
     }
 )
-def consume(): #partition_index add
+def consume():
     """Consume a log from a topic."""
     topic_name = request.get_json()["topic"]
     consumer_id = request.get_json()["consumer_id"]
+    partition_index = request.get_json()["partition_number"]
     try:
-        log = master_queue.get_log(topic_name, consumer_id)
+        log = master_queue.get_log(topic_name, partition_index, consumer_id)
         if log is not None:
             return make_response(
                 jsonify({"status": "success", "message": log.message}), 200
@@ -167,9 +169,7 @@ def consume(): #partition_index add
             200,
         )
     except Exception as e:
-        return make_response(
-            jsonify({"status": "failure", "message": str(e)}), 400
-        )
+        raise
 
 
 @app.route(rule="/size", methods=["GET"])
@@ -179,18 +179,18 @@ def consume(): #partition_index add
         "properties": {
             "topic": {"type": "string"},
             "consumer_id": {"type": "string"},
+            "partition_number": {"type": "number"}
         },
-        "required": ["topic", "consumer_id"],
+        "required": ["topic", "consumer_id", "partition_number"],
     }
 )
 def size():
     """Return the number of log messages in the requested topic for this consumer."""
     topic_name = request.get_json()["topic"]
     consumer_id = request.get_json()["consumer_id"]
+    partition_index = int(request.get_json()["partition_number"])
     try:
-        size = master_queue.get_size(topic_name, consumer_id)
+        size = master_queue.get_size(topic_name, partition_index, consumer_id)
         return make_response(jsonify({"status": "success", "size": size}), 200)
     except Exception as e:
-        return make_response(
-            jsonify({"status": "failure", "message": str(e)}), 400
-        )
+        raise

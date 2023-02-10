@@ -36,24 +36,24 @@ class Topic:
         """Add a producer to the topic."""
         self._producers.add(producer_id)
 
-    def add_consumer(self, consumer_id: str, offset: int = 0) -> None:
+    def add_consumer(self, consumer_id: str, partition_index: int, offset: int = 0) -> None:
         """Add a consumer to the topic with given offset."""
-        self._consumers.add(consumer_id, offset)
+        self._consumers.add(consumer_id, partition_index, offset)
 
     def check_producer(self, producer_id: str) -> bool:
         """Return whether the producer is in the topic."""
         return self._producers.contains(producer_id)
 
-    def check_consumer(self, consumer_id: str) -> bool:
+    def check_consumer(self, consumer_id: str, partition_index: int) -> bool:
         """Return whether the consumer is in the topic."""
-        return self._consumers.contains(consumer_id)
+        return self._consumers.contains(consumer_id, partition_index)
 
-    def get_consumer_offset(self, consumer_id: str) -> int:
+    def get_consumer_offset(self, consumer_id: str, partition_index: int) -> int:
         """Return the consumer offset."""
-        return self._consumers.get_offset(consumer_id)
+        return self._consumers.get_offset(consumer_id, partition_index)
 
     def get_and_increment_consumer_offset(
-        self, consumer_id: str, threshold: int
+        self, consumer_id: str, partition_index: int, threshold: int
     ) -> int:
         """Return the consumer offset and increment it by one."""
-        return self._consumers.get_offset_and_increment(consumer_id, threshold)
+        return self._consumers.get_offset_and_increment(consumer_id, partition_index, threshold)

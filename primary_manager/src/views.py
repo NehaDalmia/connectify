@@ -139,7 +139,7 @@ def produce():
         if "partition_number" in request.get_json():
             partition_number = request.get_json()["partition_number"]
         
-        broker_host = data_manager.get_broker_host(topic_name, producer_id, partition_number)
+        broker_host, partition_number = data_manager.get_broker_host(topic_name, producer_id, partition_number)
         response =  requests.post(
             "http://"+broker_host+":5000/producer/produce",
             json = {

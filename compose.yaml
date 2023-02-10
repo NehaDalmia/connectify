@@ -24,6 +24,8 @@ services:
         deploy:
         networks:       
             - internal
+        environment:
+            - DB_NAME=prime_datadb
         entrypoint: python3
         command: app.py
         depends_on: 
@@ -34,9 +36,11 @@ services:
         image: connectify/readonly_manager
         build: ./readonly_manager
         deploy:
-            replicas: 1
+            replicas: 3
         networks:       
             - internal
+        environment:
+            - DB_NAME=prime_datadb
         entrypoint: python3
         command: app.py
         depends_on: 

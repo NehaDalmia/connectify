@@ -1,5 +1,5 @@
 import threading
-from typing import List
+from typing import List, Tuple
 
 from src.datastructures import (
     ThreadSafeDict,
@@ -39,12 +39,12 @@ class Topic:
     def update_partition_index(self, producer_id: str, partition_index: int ) -> str :
         """Update the last partition index contacted by this producer"""
         self._producers.update(producer_id, partition_index, self._partitions)
-        return self._broker_list[partition_index]
+        return (self._broker_list[partition_index], partition_index)
        
-    def round_robin_return_and_update_partition_index(self, producer_id: str) -> str :
+    def round_robin_return_and_update_partition_index(self, producer_id: str) -> Tuple[str,int] :
         """Update the last partition index contacted by this producer in round robin manner"""
         partition_index =  self._producers.return_and_update(producer_id,self._partitions)
-        return self._broker_list[partition_index]
+        return (self._broker_list[partition_index], partition_index)
 
     def append_broker(self, broker_host:str) -> None:
         """Append broker host name to list of brokers"""

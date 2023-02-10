@@ -7,7 +7,8 @@ class Consumer(db.Model):
     topic_name = db.Column(
         db.String(256),nullable=False
     )
-    partition_index = db.Column(db.Integer)
+    partition_index = db.Column(db.Integer, primary_key=True)
     offset = db.Column(db.Integer, nullable=False)
-    ___table_args__ = (db.ForeignKeyConstraint([topic_name, partition_index],
-                                           ["topic.name", "topic.partition_index"]), {})
+    __table_args__ = (db.ForeignKeyConstraint([topic_name, partition_index],
+                                           ["topic.name", "topic.partition_index"]),
+                      db.UniqueConstraint("id", "partition_index", name="id_partition_index_constraint"))

@@ -1,5 +1,5 @@
 import threading
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Tuple
 import uuid
 import time
 import requests
@@ -90,7 +90,7 @@ class DataManager:
 
         return [consumer_id, self._topics[topic_name].get_partition_count()]
     
-    def get_broker_host(self, topic_name: str, producer_id: str, partition_number : int = None) -> str:
+    def get_broker_host(self, topic_name: str, producer_id: str, partition_number : int = None) -> Tuple[str,int]:
         """Add a log to the topic if producer is registered with topic."""
         if not self._contains(topic_name):
             raise Exception("Topic does not exist.")

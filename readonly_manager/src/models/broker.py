@@ -31,6 +31,6 @@ class Broker:
         """Return last request turn number"""
         return self._round_robin_turn
 
-    def set_last_requested(self, turn_number) -> None:
+    def set_last_requested(self, turn_number: int) -> None:
         """Return last request turn number"""
         self._round_robin_turn = turn_number

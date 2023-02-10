@@ -26,7 +26,7 @@ class MasterQueue:
             consumers = ConsumerDB.query.filter_by(topic_name=topic.name, partition_index = topic.partition_index ).all()
             for consumer in consumers:
                 self._topics[(topic.name,topic.partition_index)].add_consumer(
-                    consumer.id, consumer.offset
+                    consumer.id, topic.partition_index, consumer.offset
                 )
             # get producers with topic_name=topic.name
             # producers = ProducerDB.query.filter_by(topic_name=topic.name).all()
@@ -57,30 +57,18 @@ class MasterQueue:
         db.session.add(TopicDB(name=topic_name, partition_index = partition_index))
         db.session.commit()
 
-    def get_size(self, topic_name: str, partition_index:int,consumer_id: str) -> int:
+    def get_size(self, topic_name: str, partition_index:int, consumer_id: str) -> int:
         """Return the number of log messages in the requested topic for
         this consumer."""
-        if not self._contains((topic_name,partition_index)):
-            raise Exception("Topic does not exist.")
-        if not self._topics[(topic_name,partition_index)].check_consumer(consumer_id):
-            raise Exception("Consumer not registered with topic.")
         total_length = self._topics[(topic_name,partition_index)].get_length()
-        consumer_offset = self._topics[(topic_name,partition_index)].get_consumer_offset(
-            consumer_id
-        )
+        consumer_offset = self._topics[(topic_name,partition_index)].get_consumer_offset(consumer_id, partition_index)
         return total_length - consumer_offset
 
-    def get_log(self, topic_name: str, consumer_id: str) -> Optional[Log]: # add partition_index
+    def get_log(self, topic_name: str, partition_index: int, consumer_id: str) -> Optional[Log]:
         """Return the log if consumer registered with topic and has a log
         available to pull."""
-        if not self._contains(topic_name):
-            raise Exception("Topic does not exist.")
-        if not self._topics[topic_name].check_consumer(consumer_id):
-            raise Exception("Consumer not registered with topic.")
-        current_length = self._topics[topic_name].get_length()
-        index_to_fetch = self._topics[
-            topic_name
-        ].get_and_increment_consumer_offset(consumer_id, current_length)
+        current_length = self._topics[(topic_name, partition_index)].get_length()
+        index_to_fetch = self._topics[(topic_name, partition_index)].get_and_increment_consumer_offset(consumer_id, partition_index, current_length)
         if index_to_fetch == current_length:
             return None
 
@@ -89,11 +77,11 @@ class MasterQueue:
             f"""
             UPDATE consumer 
             SET "offset" = GREATEST("offset", {index_to_fetch + 1}) 
-            where id = '{consumer_id}'
+            where id = '{consumer_id}' and partition_index = '{partition_index}'
             """
         )
         db.session.commit()
-        return self._topics[topic_name].get_log(index_to_fetch)
+        return self._topics[(topic_name, partition_index)].get_log(index_to_fetch)
 
     def add_log(self, topic_name: str, partition_index:int, producer_id: str, message: str) -> None:
         """Add a log to the topic"""
@@ -122,7 +110,7 @@ class MasterQueue:
 
     def add_consumer(self, topic_name: str, partition_index:int, consumer_id: str) -> None:
         """Add a consumer to the topic"""
-        self._topics[(topic_name,partition_index)].add_consumer(consumer_id)
+        self._topics[(topic_name,partition_index)].add_consumer(consumer_id, partition_index)
         # add to db
         db.session.add(
             ConsumerDB(id=consumer_id, topic_name=topic_name, partition_index = partition_index,offset=0)
