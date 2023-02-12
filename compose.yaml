@@ -1,4 +1,5 @@
 version: "3.0"
+name: "connectify"
 services:
     # LOAD BALANCER
     gateway:
@@ -14,6 +15,8 @@ services:
         depends_on:
             - primary_manager
             - readonly_manager
+        environment:
+            - COMPOSE_PROJECT_NAME 
     
     # PRIMARY MANAGER
     primary_manager:
@@ -26,6 +29,8 @@ services:
             - internal
         environment:
             - DB_NAME=prime_datadb
+            - READ_REPLICAS=3 # same as replicas of read only managers
+            - COMPOSE_PROJECT_NAME 
         entrypoint: python3
         command: app.py
         depends_on: 
@@ -41,6 +46,7 @@ services:
             - internal
         environment:
             - DB_NAME=prime_datadb
+            - COMPOSE_PROJECT_NAME 
         entrypoint: python3
         command: app.py
         depends_on: 
@@ -69,6 +75,7 @@ services:
             - masterdb-1
         environment:
             - DB_NAME=masterdb-1
+            - COMPOSE_PROJECT_NAME 
         entrypoint: python3
         command: app.py
 
@@ -84,6 +91,7 @@ services:
             - masterdb-2
         environment:
             - DB_NAME=masterdb-2
+            - COMPOSE_PROJECT_NAME 
         entrypoint: python3
         command: app.py
     
@@ -99,6 +107,7 @@ services:
             - masterdb-3
         environment:
             - DB_NAME=masterdb-3
+            - COMPOSE_PROJECT_NAME 
 
     # PRIME_MANAGER DATA DB 
 
@@ -112,6 +121,7 @@ services:
         environment:
                 - 'POSTGRES_PASSWORD=postgres'
                 - 'POSTGRES_DB=prime_datadb'
+                - COMPOSE_PROJECT_NAME 
         networks:       
             - internal
     # MASTER DATABASES
@@ -126,6 +136,7 @@ services:
         environment:
                 - 'POSTGRES_PASSWORD=postgres'
                 - 'POSTGRES_DB=masterdb-1'
+                - COMPOSE_PROJECT_NAME 
         networks:       
             - internal
         
@@ -139,6 +150,7 @@ services:
         environment:
                 - 'POSTGRES_PASSWORD=postgres'
                 - 'POSTGRES_DB=masterdb-2'
+                - COMPOSE_PROJECT_NAME 
         networks:       
             - internal
     masterdb-3:
@@ -151,6 +163,7 @@ services:
         environment:
                 - 'POSTGRES_PASSWORD=postgres'
                 - 'POSTGRES_DB=masterdb-3'
+                - COMPOSE_PROJECT_NAME 
         networks:       
             - internal
         

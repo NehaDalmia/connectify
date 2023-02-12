@@ -59,12 +59,19 @@ class ReadonlyManager:
         """
         return self._brokers_by_topic_and_ptn[(topic_name, partition_number)]
 
-    def get_broker_host(self, topic_name: str, partition_number: int) -> str:
+    def get_broker_host(self, topic_name: str, partition_number: int, consumer_id: str) -> str:
         """
         Given topic name and partition number, return the corresponding broker hostname 
         """
         return self._brokers_by_topic_and_ptn[(topic_name, partition_number)].get_name()
 
+    def add_topic(self, topic_name : str, partition_count : int, broker_list : List[str]) -> None:
+        with self._lock:
+            self._topics[topic_name] = Topic(topic_name, partition_count)
+            for partition_index in range(partition_count):
+                self._brokers_by_topic_and_ptn[(topic_name,partition_index)] = Broker(broker_list[partition_index])
+            
+    
     # def find_best_broker(self, topic_name: str) -> str:
     #     """
     #     Given topic name, find a broker handling that topic. Use round-robin policy
@@ -106,7 +113,8 @@ class ReadonlyManager:
     
     def has_topic(self, topic_name: str) -> bool:
         """Check if topic exists."""
-        return topic_name in self._topics.keys()
+        with self._lock:
+            return topic_name in self._topics.keys()
 
     def get_broker_count(self) -> int:
         """Return the number of brokers."""
@@ -114,11 +122,13 @@ class ReadonlyManager:
 
     def get_partition_count(self, topic_name: str) -> int:
         """Return the number of partitions in a given topic."""
-        return self._topics[topic_name].get_partition_count()
+        with self._lock:
+            return self._topics[topic_name].get_partition_count()
     
     def is_registered(self, consumer_id: str, topic_name: str) -> bool:
         """Check if consumer is registered to topic"""
-        return self._topics[topic_name].contains(consumer_id)
+        with self._lock:
+            return self._topics[topic_name].contains(consumer_id)
     
     def is_request_valid(self, topic_name: str, consumer_id: str, partition_number: int = None) -> str:
         """
@@ -131,3 +141,7 @@ class ReadonlyManager:
                 raise Exception("Invalid partition number.")
         if not self.is_registered(consumer_id, topic_name):
             raise Exception("Consumer not registered with topic.")
+    
+    def add_consumer_to_topic(self,topic_name : str, consumer_id : str) -> None:
+        with self._lock:
+            self._topics[topic_name].add_consumer(consumer_id)

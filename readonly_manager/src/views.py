@@ -1,6 +1,7 @@
 from flask import make_response, request, jsonify
 from flask_expects_json import expects_json
 from jsonschema import ValidationError
+import logging
 
 from src import app, ro_manager, requests, expects_json
 
@@ -30,6 +31,7 @@ def topics():
         return make_response(
             jsonify({"status": "failure", "message": str(e)}), 400
         )
+    
 
 @app.route(rule="/consumer/consume", methods=["GET"])
 @expects_json(
@@ -117,8 +119,11 @@ def size():
     topic_name = request.get_json()["topic"]
     consumer_id = request.get_json()["consumer_id"]
     partition_number = int(request.get_json()["partition_number"])
-    # ADDDDDDDDD SANITY CHECK
     try:
+        try:
+            ro_manager.is_request_valid(topic_name, consumer_id,partition_number)
+        except Exception as e:
+            raise
         broker_host = ro_manager.get_broker_host(topic_name, partition_number)
         # Forward this request to a broker, wait for a response
         response = requests.get(
@@ -133,3 +138,59 @@ def size():
         return make_response(
             jsonify({"status": "failure", "message": str(e)}), 400
         )
+
+# endpoints for syncing between primary and read only managers
+
+@app.route(rule="/sync/topics", methods=["POST"])
+@expects_json(
+    {
+        "type": "object",
+        "properties": {"name": {"type": "string"},"number_of_partitions":{"type":"number"},"broker_list":{"type":"array"}},
+        "required": ["name","number_of_partitions","broker_list"],
+    },
+)
+def sync_topics():
+    """Add new topic to loaded memory"""
+    
+    topic_name = request.get_json()["name"]
+    number_of_partitions = request.get_json()["number_of_partitions"]
+    broker_list = request.get_json()["broker_list"]
+    try:
+        ro_manager.add_topic(topic_name,number_of_partitions,broker_list)
+        return make_response(
+                jsonify(
+                    {
+                        "status": "success"
+                    }
+                ),
+                200,
+        )
+    except Exception as e:
+        return make_response(
+                jsonify({"status": "failure", "message": str(e)}), 400
+            )
+
+@app.route(rule="/sync/consumer/register", methods=["POST"])
+@expects_json(
+    {
+        "type": "object",
+        "properties": {"topic": {"type": "string"}, "consumer_id":{"type":"string"}},
+        "required": ["topic","consumer_id"],
+    }
+)
+def sync_register_consumer():
+    """Register a consumer for a topic in loaded memory"""
+    topic_name = request.get_json()["topic"]
+    consumer_id = request.get_json()["consumer_id"]
+    try:
+        ro_manager.add_consumer_to_topic(topic_name, consumer_id)   
+        return make_response(
+                jsonify(
+                    {
+                        "status": "success",
+                    }
+                ),
+                200,
+        )  
+    except Exception as e:
+        raise
