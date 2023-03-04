@@ -217,3 +217,90 @@ def sync_register_consumer():
         )  
     except Exception as e:
         raise
+
+@app.route(rule="/sync/broker/add", methods=["POST"])
+@expects_json(
+    {
+        "type": "object",
+        "properties": {
+            "broker_host": {"type": "string"},
+        },
+        "required": ["broker_host"],
+    }
+)
+def add_broker():
+    """Add a broker"""
+    broker_host = request.get_json()["broker_host"]
+
+    try:
+        ro_manager.add_broker(broker_host)
+    except Exception as e:
+        return make_response(
+            jsonify({"status": "failure", "message": str(e)}), 400
+        )
+    return make_response(jsonify({"status": "success",}),200,)
+
+@app.route(rule="/admin/broker/remove", methods=["POST"])
+@expects_json(
+    {
+        "type": "object",
+        "properties": {
+            "broker_host": {"type": "string"},
+        },
+        "required": ["broker_host"],
+    }
+
+)
+def remove_broker():
+    """Remove a broker"""
+    broker_host = request.get_json()["broker_host"]
+    try:
+        ro_manager.remove_broker(broker_host)
+    except Exception as e:
+        return make_response(
+            jsonify({"status": "failure", "message": str(e)}), 400
+        )
+    return make_response(jsonify({"status": "success",}),200,)
+    
+@app.route(rule="/sync/broker/activate", methods=["POST"])
+@expects_json(
+    {
+        "type": "object",
+        "properties": {
+            "broker_host": {"type": "string"},
+        },
+        "required": ["broker_host"],
+    }
+)
+def activate_broker():
+    """Activate a broker"""
+    broker_host = request.get_json()["broker_host"]
+    try:
+        ro_manager.activate_broker(broker_host)
+    except Exception as e:
+        return make_response(
+            jsonify({"status": "failure", "message": str(e)}), 400
+        )
+    return make_response(jsonify({"status": "success",}),200,)
+
+@app.route(rule="/sync/broker/deactivate", methods=["POST"])
+@expects_json(
+    {
+        "type": "object",
+        "properties": {
+            "broker_host": {"type": "string"},
+        },
+        "required": ["broker_host"],
+    }
+)
+def deactivate_broker():
+    """Deactivate a broker"""
+    broker_host = request.get_json()["broker_host"]
+    try:
+        ro_manager.deactivate_broker(broker_host)
+
+    except Exception as e:
+        return make_response(
+            jsonify({"status": "failure", "message": str(e)}), 400
+        )
+    return make_response(jsonify({"status": "success",}),200,)

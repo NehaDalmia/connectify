@@ -187,3 +187,145 @@ def produce():
             jsonify({"status": "failure", "message": str(e)}), 400
         )
 
+
+@app.route(rule="/admin/broker/add", methods=["POST"])
+@expects_json(
+    {
+        "type": "object",
+        "properties": {
+            "broker_host": {"type": "string"},
+            "token": {"type": "string"},
+        },
+        "required": ["broker_host", "token"],
+    }
+)
+def add_broker():
+    """Add a broker"""
+    broker_host = request.get_json()["broker_host"]
+    token = request.get_json()["token"]
+
+    if token != "rnn1234":  # replace with actual key!
+        return make_response(
+            jsonify({"status": "failure", "message": "Authentication failed"}), 400
+        )
+    try:
+        data_manager.add_broker(broker_host)
+
+        read_only_count = int(os.environ["READ_REPLICAS"])
+        project_name = os.environ["COMPOSE_PROJECT_NAME"]
+        for i in range(read_only_count): #async
+            requests.post(f"http://{project_name}-readonly_manager-{i+1}:5000/sync/broker/add", json = {
+                "broker_host":broker_host,
+            })
+
+    except Exception as e:
+        return make_response(
+            jsonify({"status": "failure", "message": str(e)}), 400
+        )
+    return make_response(jsonify({"status": "success",}),200,)
+
+@app.route(rule="/admin/broker/remove", methods=["POST"])
+@expects_json(
+    {
+        "type": "object",
+        "properties": {
+            "broker_host": {"type": "string"},
+            "token": {"type": "string"},
+        },
+        "required": ["broker_host", "token"],
+    }
+)
+def remove_broker():
+    """Remove a broker"""
+    broker_host = request.get_json()["broker_host"]
+    token = request.get_json()["token"]
+
+    if token != "rnn1234":  # replace with actual key!
+        return make_response(
+            jsonify({"status": "failure", "message": "Authentication failed"}), 400
+        )
+    try:
+        data_manager.remove_broker(broker_host)
+
+        read_only_count = int(os.environ["READ_REPLICAS"])
+        project_name = os.environ["COMPOSE_PROJECT_NAME"]
+        for i in range(read_only_count): #async
+            requests.post(f"http://{project_name}-readonly_manager-{i+1}:5000/sync/broker/remove", json = {
+                "broker_host":broker_host,
+            })
+
+    except Exception as e:
+        return make_response(
+            jsonify({"status": "failure", "message": str(e)}), 400
+        )
+    return make_response(jsonify({"status": "success",}),200,)
+    
+@app.route(rule="/admin/broker/activate", methods=["POST"])
+@expects_json(
+    {
+        "type": "object",
+        "properties": {
+            "broker_host": {"type": "string"},
+            "token": {"type": "string"},
+        },
+        "required": ["broker_host", "token"],
+    }
+)
+def activate_broker():
+    """Activate a broker"""
+    broker_host = request.get_json()["broker_host"]
+    token = request.get_json()["token"]
+
+    if token != "rnn1234":  # replace with actual key!
+        return make_response(
+            jsonify({"status": "failure", "message": "Authentication failed"}), 400
+        )
+    try:
+        data_manager.activate_broker(broker_host)
+        read_only_count = int(os.environ["READ_REPLICAS"])
+        project_name = os.environ["COMPOSE_PROJECT_NAME"]
+        for i in range(read_only_count): #async
+            requests.post(f"http://{project_name}-readonly_manager-{i+1}:5000/sync/broker/activate", json = {
+                "broker_host":broker_host,
+            })
+
+    except Exception as e:
+        return make_response(
+            jsonify({"status": "failure", "message": str(e)}), 400
+        )
+    return make_response(jsonify({"status": "success",}),200,)
+
+@app.route(rule="/admin/broker/deactivate", methods=["POST"])
+@expects_json(
+    {
+        "type": "object",
+        "properties": {
+            "broker_host": {"type": "string"},
+            "token": {"type": "string"},
+        },
+        "required": ["broker_host", "token"],
+    }
+)
+def deactivate_broker():
+    """Deactivate a broker"""
+    broker_host = request.get_json()["broker_host"]
+    token = request.get_json()["token"]
+
+    if token != "rnn1234":  # replace with actual key!
+        return make_response(
+            jsonify({"status": "failure", "message": "Authentication failed"}), 400
+        )
+    try:
+        data_manager.deactivate_broker(broker_host)
+        read_only_count = int(os.environ["READ_REPLICAS"])
+        project_name = os.environ["COMPOSE_PROJECT_NAME"]
+        for i in range(read_only_count): #async
+            requests.post(f"http://{project_name}-readonly_manager-{i+1}:5000/sync/broker/deactivate", json = {
+                "broker_host":broker_host,
+            })
+
+    except Exception as e:
+        return make_response(
+            jsonify({"status": "failure", "message": str(e)}), 400
+        )
+    return make_response(jsonify({"status": "success",}),200,)
