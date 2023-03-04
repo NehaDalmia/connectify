@@ -7,8 +7,6 @@ topic_name2 = "test_topic_n_2"
 topic_name3 = "test_topic_n_3"
 topic_name4 = "test_topic_n_4"
 
-
-
 # Test create topic
 
 response = requests.post(
@@ -158,6 +156,12 @@ response = requests.get(
 assert response.status_code == 200
 assert response.json()["status"] == "success"
 assert len(response.json()["sizes"]) == 2
+total = 0
+for dict in response.json()["sizes"]:
+    if dict["partition_number"] == 0:
+        assert dict["size"] >= 1
+    total += dict["size"]
+assert total == 2
 
 # Test size when topic does not exist
 

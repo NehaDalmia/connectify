@@ -7,24 +7,23 @@ import time
 
 TIMES = 100
 counters = [[0 for _ in range(10)] for _ in range(10)]
-k = 5
+id = 5
 
 def cons(i):
 
-    # register to topic
     for time in range(TIMES):
 
         # create topic
         response = requests.post(
             "http://172.19.0.1:8080/topics",
-            json={"name": f"test_topic_{k}_{time}", "number_of_partitions":9},
+            json={"name": f"test_topic_{id}_{time}", "number_of_partitions":9},
         )
         print(response.json()["message"])
         
         #register to a topic
         response = requests.post(
             "http://172.19.0.1:8080/consumer/register",
-        json={"topic": f"test_topic_{k}_{time}"},
+        json={"topic": f"test_topic_{id}_{time}"},
         )
         assert response.status_code == 200
         consumer_id = response.json()["consumer_id"]
