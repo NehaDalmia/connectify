@@ -5,7 +5,7 @@ import time
 
 from src.models import Topic, Log
 from src import db
-from src import TopicDB, ConsumerDB, ProducerDB, LogDB
+from src import TopicDB, ConsumerDB, LogDB
 
 
 class MasterQueue:
@@ -28,10 +28,6 @@ class MasterQueue:
                 self._topics[(topic.name,topic.partition_index)].add_consumer(
                     consumer.id, topic.partition_index, consumer.offset
                 )
-            # get producers with topic_name=topic.name
-            # producers = ProducerDB.query.filter_by(topic_name=topic.name).all()
-            # for producer in producers:
-            #     self._topics[topic.name].add_producer(producer.id)
             # get logs with topic_name=topic.name and ordered by their ids
             logs = (
                 LogDB.query.filter_by(topic_name=topic.name,partition_index = topic.partition_index)
@@ -48,7 +44,7 @@ class MasterQueue:
         with self._lock:
             return (topic_name,partition_index) in self._topics
 
-    def check_and_add_topic(self, topic_name: str, partition_index:int) -> None:
+    def add_topic(self, topic_name: str, partition_index:int) -> None:
         """Add a topic to the master queue."""
         with self._lock:
             self._topics[(topic_name,partition_index)] = Topic(topic_name, partition_index)

@@ -39,7 +39,7 @@ def topics():
         "type": "object",
         "properties": {
             "topic": {"type": "string"},
-            "partition_number": {"type": "number"},
+            "partition_index": {"type": "number"},
             "consumer_id": {"type": "string"},
         },
         "required": ["topic", "consumer_id"],
@@ -49,13 +49,13 @@ def consume():
     """Sanity check and assign consume request to a broker"""
     topic_name = request.get_json()["topic"]
     consumer_id = request.get_json()["consumer_id"]
-    partition_number: int = None
+    partition_index: int = None
     read_from_given_partition = False
 
     try:
-        partition_number = int(request.get_json()["partition_number"])
+        partition_index = int(request.get_json()["partition_index"])
         try:
-            ro_manager.is_request_valid(topic_name, consumer_id, partition_number)
+            ro_manager.is_request_valid(topic_name, consumer_id, partition_index)
         except Exception as e:
             return make_response(
                 jsonify({"status": "failure", "message": str(e)}), 400
@@ -68,7 +68,7 @@ def consume():
             return make_response(
                 jsonify({"status": "failure", "message": str(e)}), 400
             )
-        partition_number = ro_manager.find_best_partition(topic_name, consumer_id)
+        partition_index = ro_manager.find_best_partition(topic_name, consumer_id)
 
     try:
         num_tries = 0
@@ -77,10 +77,10 @@ def consume():
         num_partitions = ro_manager.get_partition_count(topic_name)
         # Try all brokers once, and infer no logs to read only if all brokers say so
         while num_tries < num_partitions:
-            broker_host = ro_manager.get_broker_host(topic_name, partition_number)[0]
-            # Add partition_number to the request data
+            broker_host = ro_manager.get_broker_host(topic_name, partition_index)[0]
+            # Add partition_index to the request data
             json_data = request.get_json()
-            json_data["partition_number"] = partition_number
+            json_data["partition_index"] = partition_index
             # Forward this request to a broker, wait for a response
             response = requests.get(
                 url = "http://"+broker_host+":5000/consumer/consume",
@@ -91,7 +91,7 @@ def consume():
                 success = True
                 break
             num_tries += 1
-            partition_number = (partition_number + 1) % num_partitions
+            partition_index = (partition_index + 1) % num_partitions
             # If consumer wanted to read from given partition only, then exit loop
             if read_from_given_partition == True and num_tries == 1:
                 break
@@ -114,7 +114,7 @@ def consume():
         "properties": {
             "topic": {"type": "string"},
             "consumer_id": {"type": "string"},
-            "partition_number": {"type": "number"}
+            "partition_index": {"type": "number"}
         },
         "required": ["topic", "consumer_id"]
     }
@@ -123,11 +123,11 @@ def size():
     """Sanity check and assign size request to a broker."""
     topic_name = request.get_json()["topic"]
     consumer_id = request.get_json()["consumer_id"]
-    partition_number = None
+    partition_index = None
     try:
-        partition_number = int(request.get_json()["partition_number"])
+        partition_index = int(request.get_json()["partition_index"])
         try:
-            ro_manager.is_request_valid(topic_name, consumer_id, partition_number)
+            ro_manager.is_request_valid(topic_name, consumer_id, partition_index)
         except Exception as e:
             return make_response(
                 jsonify({"status": "failure", "message": str(e)}), 400
@@ -145,7 +145,7 @@ def size():
         # Contact each broker that contains partitions of the given topic. If
         # partition number is given only that broker that contains the partition
         # is contacted.
-        for broker_host in ro_manager.get_broker_host(topic_name, partition_number):
+        for broker_host in ro_manager.get_broker_host(topic_name, partition_index):
             # Forward this request to the broker, wait for a response
             response = requests.get(
                 url = "http://"+broker_host+":5000/size",

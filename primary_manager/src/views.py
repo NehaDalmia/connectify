@@ -154,7 +154,7 @@ def register_consumer():
             "topic": {"type": "string"},
             "producer_id": {"type": "string"},
             "message": {"type": "string"},
-            "partition_number": {"type":"number"},
+            "partition_index": {"type":"number"},
         },
         "required": ["topic", "producer_id", "message"],
     }
@@ -165,18 +165,18 @@ def produce():
     producer_id = request.get_json()["producer_id"]
     message = request.get_json()["message"]
     try:
-        partition_number = None
-        if "partition_number" in request.get_json():
-            partition_number = request.get_json()["partition_number"]
+        partition_index = None
+        if "partition_index" in request.get_json():
+            partition_index = request.get_json()["partition_index"]
         
-        broker_host, partition_number = data_manager.get_broker_host(topic_name, producer_id, partition_number)
+        broker_host, partition_index = data_manager.get_broker_host(topic_name, producer_id, partition_index)
         response =  requests.post(
             "http://"+broker_host+":5000/producer/produce",
             json = {
                 "topic":topic_name, 
                 "producer_id":producer_id,
                 "message":message,
-                "partition_index":partition_number})
+                "partition_index":partition_index})
         
         return make_response( 
             jsonify({"status": "success"}),

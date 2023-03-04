@@ -100,7 +100,7 @@ response = requests.post(
         "topic": topic_name,
         "producer_id": producer_id,
         "message": "test_message2",
-        "partition_number":0
+        "partition_index":0
     },
 )
 assert response.status_code == 200
@@ -114,7 +114,7 @@ response = requests.post(
         "topic": topic_name,
         "producer_id": producer_id,
         "message": "test_message2",
-        "partition_number":100
+        "partition_index":100
     },
 )
 assert response.status_code == 400
@@ -163,7 +163,7 @@ assert len(response.json()["sizes"]) == 2
 
 response = requests.get(
     "http://172.19.0.1:8080/size",
-    json={"topic": "non_existent", "consumer_id": consumer_id, "partition_number":0},
+    json={"topic": "non_existent", "consumer_id": consumer_id, "partition_index":0},
 )
 assert response.status_code == 400
 assert response.json()["status"] == "failure"
@@ -173,7 +173,7 @@ assert response.json()["message"] == "Topic does not exist."
 
 response = requests.get(
     "http://172.19.0.1:8080/size",
-    json={"topic": topic_name2, "consumer_id": consumer_id,"partition_number":0},
+    json={"topic": topic_name2, "consumer_id": consumer_id,"partition_index":0},
 )
 assert response.status_code == 400
 assert response.json()["status"] == "failure"
@@ -183,7 +183,7 @@ assert response.json()["message"] == "Consumer not registered with topic."
 
 response = requests.get(
     "http://172.19.0.1:8080/size",
-    json={"topic": topic_name2, "consumer_id": consumer_id,"partition_number":100},
+    json={"topic": topic_name2, "consumer_id": consumer_id,"partition_index":100},
 )
 assert response.status_code == 400
 assert response.json()["status"] == "failure"
@@ -223,7 +223,7 @@ assert response.json()["message"] == "Consumer not registered with topic."
 
 response = requests.get(
     "http://172.19.0.1:8080/size",
-    json={"topic": topic_name, "consumer_id": consumer_id, "partition_number":0},
+    json={"topic": topic_name, "consumer_id": consumer_id, "partition_index":0},
 )
 assert response.status_code == 200
 assert response.json()["status"] == "success"
@@ -232,7 +232,7 @@ size_old =  response.json()["sizes"][0]["size"]
 # Test consume to a specific partition index
 response = requests.get(
     "http://172.19.0.1:8080/consumer/consume",
-    json={"topic": topic_name, "partition_number":0, "consumer_id": consumer_id},
+    json={"topic": topic_name, "partition_index":0, "consumer_id": consumer_id},
 )
 assert response.status_code == 200
 assert response.json()["status"] == "success"
@@ -241,7 +241,7 @@ assert response.json()["message"] == "test_message2"
 # Test consume to a specific partition index when index invalid
 response = requests.get(
     "http://172.19.0.1:8080/consumer/consume",
-    json={"topic": topic_name, "partition_number":100, "consumer_id": consumer_id},
+    json={"topic": topic_name, "partition_index":100, "consumer_id": consumer_id},
 )
 assert response.status_code == 400
 assert response.json()["status"] == "failure"
@@ -252,7 +252,7 @@ assert response.json()["message"] == "Invalid partition number."
 
 response = requests.get(
     "http://172.19.0.1:8080/size",
-    json={"topic": topic_name, "consumer_id": consumer_id, "partition_number":0},
+    json={"topic": topic_name, "consumer_id": consumer_id, "partition_index":0},
 )
 assert response.status_code == 200
 assert response.json()["status"] == "success"
