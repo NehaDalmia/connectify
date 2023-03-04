@@ -19,6 +19,8 @@ class ReadonlyManager:
         self._brokers_by_topic_and_ptn: Dict[(str, int), Broker] = {}
         self._topics: Dict[str, Topic] = {}
         self._brokers: List[Broker] = []
+        self._active_brokers: Set[str] = set()
+        self._inactive_brokers : Set[str] = set()
 
     def init_from_db(self) -> None:
         """
@@ -32,6 +34,13 @@ class ReadonlyManager:
         # self._round_robin_turn_counter = 0
         for i in range(self._broker_count):
             self._brokers.append(Broker(i+1))
+        
+        brokers = BrokerDB.query.all()
+        for broker in brokers:
+            if broker.status == 1:
+                self._active_brokers.add(broker.name)
+            else :
+                self._inactive_brokers.add(broker.name)
         
         # # Initialize the round robin turns of the brokers in a random order
         # # DD: Reduces the chance of several readonly managers running R.R. in the same order
@@ -75,29 +84,6 @@ class ReadonlyManager:
             self._topics[topic_name] = Topic(topic_name, partition_count)
             for partition_index in range(partition_count):
                 self._brokers_by_topic_and_ptn[(topic_name,partition_index)] = Broker(broker_list[partition_index])
-            
-    
-    # def find_best_broker(self, topic_name: str) -> str:
-    #     """
-    #     Given topic name, find a broker handling that topic. Use round-robin policy
-    #     to assign a broker. Return the corresponding broker hostname.
-    #     """
-    #     best_broker_number = -1
-    #     with self._lock:
-    #         min_turn = self._broker_count
-    #         # Among the subset of brokers that contain partitions of the topic passed, find the one
-    #         # that got it's turn the earliest, reassign 
-    #         for partition_idx in range(self._topics[topic_name].get_partition_count()):
-    #             broker_number = self.get_broker(topic_name, partition_idx).get_number()
-    #             broker_last_turn = self._brokers[broker_number-1].get_last_requested()
-    #             adjusted_turn = (broker_last_turn - self._round_robin_turn_counter + self._broker_count) % self._broker_count
-    #             if adjusted_turn < min_turn :
-    #                 min_turn = adjusted_turn
-    #                 best_broker_number = broker_number
-    #         self._brokers[best_broker_number-1].set_last_requested(self._round_robin_turn_counter)
-    #         self.round_robin_turn_counter_increment()
-        
-    #     return self._brokers[best_broker_number-1].get_name()
 
     def find_best_partition(self, topic_name: str, consumer_id: str) -> Tuple[int,str]:
         """
@@ -149,3 +135,32 @@ class ReadonlyManager:
     def add_consumer_to_topic(self,topic_name : str, consumer_id : str) -> None:
         with self._lock:
             self._topics[topic_name].add_consumer(consumer_id)
+            
+    def add_broker(self, broker_host) -> None: 
+        with self._lock:
+            if ( broker_host in self._active_brokers ) or ( broker_host in self._inactive_brokers ) : 
+                raise Exception("Broker with hostname already exists.")
+            self._active_brokers.add(broker_host)
+    
+    def remove_broker(self, broker_host) -> None: 
+        with self._lock:
+            if ( broker_host not in self._active_brokers ) and ( broker_host not in self._inactive_brokers ) : 
+                raise Exception("Broker with hostname not present.")
+            if broker_host in self._active_brokers :
+                self._brokers.remove(broker_host)
+            else :
+                self._inactive_brokers.remove(broker_host)
+    
+    def activate_broker(self, broker_host) -> None: 
+        with self._lock:
+            if ( broker_host not in self._inactive_brokers ): 
+                raise Exception("Broker with hostname not inactive.")
+            self._active_brokers.add(broker_host)
+            self._inactive_brokers.remove(broker_host)
+
+    def deactivate_broker(self, broker_host) -> None: 
+        with self._lock:
+            if ( broker_host not in self._active_brokers ): 
+                raise Exception("Broker with hostname not active.")
+            self._inactive_brokers.add(broker_host)
+            self._active_brokers.remove(broker_host)
