@@ -160,7 +160,7 @@ def consume():
         log = master_queue.get_log(topic_name, partition_index, consumer_id)
         if log is not None:
             return make_response(
-                jsonify({"status": "success", "message": log.message}), 200
+                jsonify({"status": "success", "message": log.message, "partition_read": partition_index}), 200
             )
         return make_response(
             jsonify(
@@ -181,16 +181,20 @@ def consume():
             "consumer_id": {"type": "string"},
             "partition_number": {"type": "number"}
         },
-        "required": ["topic", "consumer_id", "partition_number"],
+        "required": ["topic", "consumer_id"],
     }
 )
 def size():
     """Return the number of log messages in the requested topic for this consumer."""
     topic_name = request.get_json()["topic"]
     consumer_id = request.get_json()["consumer_id"]
-    partition_index = int(request.get_json()["partition_number"])
+    partition_index = None
     try:
-        size = master_queue.get_size(topic_name, partition_index, consumer_id)
-        return make_response(jsonify({"status": "success", "size": size}), 200)
+        partition_index = int(request.get_json()["partition_number"])
+    except:
+        pass
+    try:
+        sizes = master_queue.get_size(consumer_id, topic_name, partition_index)
+        return make_response(jsonify({"status": "success", "sizes": sizes}), 200)
     except Exception as e:
         raise

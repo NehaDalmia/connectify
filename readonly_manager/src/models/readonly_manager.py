@@ -1,5 +1,5 @@
 import threading
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Set
 from datetime import datetime
 import random
 
@@ -59,11 +59,16 @@ class ReadonlyManager:
         """
         return self._brokers_by_topic_and_ptn[(topic_name, partition_number)]
 
-    def get_broker_host(self, topic_name: str, partition_number: int, consumer_id: str) -> str:
+    def get_broker_host(self, topic_name: str, partition_number: int = None) -> List[str]:
         """
         Given topic name and partition number, return the corresponding broker hostname 
         """
-        return self._brokers_by_topic_and_ptn[(topic_name, partition_number)].get_name()
+        if partition_number is None:
+            broker_hosts: Set = set()
+            for partition_number in range(self.get_partition_count(topic_name)):
+                broker_hosts.add(self._brokers_by_topic_and_ptn[(topic_name, partition_number)].get_name())
+            return list(broker_hosts)
+        return [self._brokers_by_topic_and_ptn[(topic_name, partition_number)].get_name()]
 
     def add_topic(self, topic_name : str, partition_count : int, broker_list : List[str]) -> None:
         with self._lock:
@@ -136,9 +141,8 @@ class ReadonlyManager:
         """
         if not self.has_topic(topic_name):
             raise Exception("Topic does not exist.")
-        if partition_number is not None:
-            if partition_number >= self._topics[topic_name].get_partition_count() or partition_number < 0:
-                raise Exception("Invalid partition number.")
+        if partition_number is not None and (partition_number >= self._topics[topic_name].get_partition_count() or partition_number < 0):
+            raise Exception("Invalid partition number.")
         if not self.is_registered(consumer_id, topic_name):
             raise Exception("Consumer not registered with topic.")
     

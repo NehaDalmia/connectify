@@ -73,10 +73,11 @@ def consume():
     try:
         num_tries = 0
         response = None
+        success = False
         num_partitions = ro_manager.get_partition_count(topic_name)
         # Try all brokers once, and infer no logs to read only if all brokers say so
         while num_tries < num_partitions:
-            broker_host = ro_manager.get_broker_host(topic_name, partition_number)
+            broker_host = ro_manager.get_broker_host(topic_name, partition_number)[0]
             # Add partition_number to the request data
             json_data = request.get_json()
             json_data["partition_number"] = partition_number
@@ -87,6 +88,7 @@ def consume():
             )
             # Check response received from broker, if success, then exit loop
             if(response.json()["status"] == "success"):
+                success = True
                 break
             num_tries += 1
             partition_number = (partition_number + 1) % num_partitions
@@ -94,8 +96,11 @@ def consume():
             if read_from_given_partition == True and num_tries == 1:
                 break
         # Reply to consumer
+        response_dict = {"status": response.json()["status"], "message": response.json()["message"]}
+        if success:
+           response_dict["partition_read"] = response.json()["partition_read"] 
         return make_response(
-            jsonify({"status": response.json()["status"], "message": response.json()["message"]}), 200
+            jsonify(response_dict), 200
         )
     except Exception as e:
         return make_response(
@@ -111,33 +116,51 @@ def consume():
             "consumer_id": {"type": "string"},
             "partition_number": {"type": "number"}
         },
-        "required": ["topic", "consumer_id", "partition_number"]
+        "required": ["topic", "consumer_id"]
     }
 )
 def size():
     """Sanity check and assign size request to a broker."""
     topic_name = request.get_json()["topic"]
     consumer_id = request.get_json()["consumer_id"]
-    partition_number = int(request.get_json()["partition_number"])
+    partition_number = None
     try:
+        partition_number = int(request.get_json()["partition_number"])
         try:
-            ro_manager.is_request_valid(topic_name, consumer_id,partition_number)
+            ro_manager.is_request_valid(topic_name, consumer_id, partition_number)
         except Exception as e:
-            raise
-        broker_host = ro_manager.get_broker_host(topic_name, partition_number)
-        # Forward this request to a broker, wait for a response
-        response = requests.get(
-            url = "http://"+broker_host+":5000/size",
-            json = request.get_json()
-        )
+            return make_response(
+                jsonify({"status": "failure", "message": str(e)}), 400
+            )
+    except Exception as e:
+        try:
+            ro_manager.is_request_valid(topic_name, consumer_id)
+        except Exception as e:
+            return make_response(
+                jsonify({"status": "failure", "message": str(e)}), 400
+            )
+    
+    try:
+        sizes = []
+        # Contact each broker that contains partitions of the given topic. If
+        # partition number is given only that broker that contains the partition
+        # is contacted.
+        for broker_host in ro_manager.get_broker_host(topic_name, partition_number):
+            # Forward this request to the broker, wait for a response
+            response = requests.get(
+                url = "http://"+broker_host+":5000/size",
+                json = request.get_json()
+            )
+            sizes.extend(list(response.json()["sizes"]))
         # Reply to consumer
         return make_response(
-            jsonify({"status": response.json()["status"], "size": response.json()["size"]}), 200
+            jsonify({"status": response.json()["status"], "sizes": sizes}), 200
         )
     except Exception as e:
         return make_response(
             jsonify({"status": "failure", "message": str(e)}), 400
         )
+
 
 # endpoints for syncing between primary and read only managers
 

@@ -18,14 +18,13 @@ def bad_request(error):
     # handle other bad request errors
     return error
 
-@app.route(rule="/topics", methods=["GET", "POST"])
+@app.route(rule="/topics", methods=["POST"])
 @expects_json(
     {
         "type": "object",
         "properties": {"name": {"type": "string"},"number_of_partitions":{"type":"number"}},
         "required": ["name"],
-    },
-    ignore_for=["GET"],
+    }
 )
 def topics():
     """Add a topic."""

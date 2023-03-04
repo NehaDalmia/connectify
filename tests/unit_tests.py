@@ -150,14 +150,14 @@ assert response.status_code == 400
 assert response.json()["status"] == "failure"
 assert response.json()["message"] == "Producer not registered with topic."
 
-# Test size over all partitions of a topic --> AFTER RAJAT IMPLEMENTS
-# response = requests.get(
-#     "http://172.19.0.1:8080/size",
-#     json={"topic": topic_name, "consumer_id": consumer_id},
-# )
-# assert response.status_code == 200
-# assert response.json()["status"] == "success"
-# assert response.json()["size"] == 2
+# Test size over all partitions of a topic
+response = requests.get(
+    "http://172.19.0.1:8080/size",
+    json={"topic": topic_name, "consumer_id": consumer_id},
+)
+assert response.status_code == 200
+assert response.json()["status"] == "success"
+assert len(response.json()["sizes"]) == 2
 
 # Test size when topic does not exist
 
@@ -227,7 +227,7 @@ response = requests.get(
 )
 assert response.status_code == 200
 assert response.json()["status"] == "success"
-size_old =  response.json()["size"]
+size_old =  response.json()["sizes"][0]["size"]
 
 # Test consume to a specific partition index
 response = requests.get(
@@ -256,6 +256,6 @@ response = requests.get(
 )
 assert response.status_code == 200
 assert response.json()["status"] == "success"
-assert response.json()["size"] == size_old - 1
+assert response.json()["sizes"][0]["size"] == size_old - 1
 
 print("DONE")

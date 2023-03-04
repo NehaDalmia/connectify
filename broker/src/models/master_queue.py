@@ -57,12 +57,26 @@ class MasterQueue:
         db.session.add(TopicDB(name=topic_name, partition_index = partition_index))
         db.session.commit()
 
-    def get_size(self, topic_name: str, partition_index:int, consumer_id: str) -> int:
-        """Return the number of log messages in the requested topic for
-        this consumer."""
+    def get_size(self, consumer_id: str, topic_name: str, partition_index:int = None) -> List[Dict[str,int]]:
+        """Return the number of log messages in the requested partition for
+        this consumer. If only topic is specified and no partition, return the 
+        total number of messages in all partitions."""
+        if partition_index is None:
+            sizes: List[Dict[str,int]] = []
+            partitions = [tuple[1] for tuple in self._topics.keys() if tuple[0] == topic_name]
+            for p in partitions:
+                sizes.append(self.get_size_of_partition(consumer_id, topic_name, p))
+            return sizes
+        return [self.get_size_of_partition(consumer_id, topic_name, partition_index)]
+
+    def get_size_of_partition(self, consumer_id: str, topic_name: str, partition_index: int) -> Dict[str,int]:
+        """
+        Return the number of log messages in the requested partition for
+        this consumer.
+        """
         total_length = self._topics[(topic_name,partition_index)].get_length()
         consumer_offset = self._topics[(topic_name,partition_index)].get_consumer_offset(consumer_id, partition_index)
-        return total_length - consumer_offset
+        return {"partition_number": partition_index, "size": total_length - consumer_offset}
 
     def get_log(self, topic_name: str, partition_index: int, consumer_id: str) -> Optional[Log]:
         """Return the log if consumer registered with topic and has a log
