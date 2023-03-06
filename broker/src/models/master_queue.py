@@ -4,7 +4,7 @@ import uuid
 import time
 
 from src.models import Topic, Log
-from src import db
+from src import db, app
 from src import TopicDB, ConsumerDB, LogDB
 
 
@@ -21,23 +21,25 @@ class MasterQueue:
         """Initialize the master queue from the db."""
         topics = TopicDB.query.all()
         for topic in topics:
-            self._topics[(topic.name,topic.partition_index)] = Topic(topic.name, topic.partition_index)
+            length = LogDB.query.filter_by(topic_name = topic.name, partition_index = topic.partition_index).count()
+            self._topics[(topic.name,topic.partition_index)] = Topic(topic.name, topic.partition_index, length)
             # get consumers with topic_name=topic.name
             consumers = ConsumerDB.query.filter_by(topic_name=topic.name, partition_index = topic.partition_index ).all()
             for consumer in consumers:
                 self._topics[(topic.name,topic.partition_index)].add_consumer(
                     consumer.id, topic.partition_index, consumer.offset
                 )
-            # get logs with topic_name=topic.name and ordered by their ids
-            logs = (
-                LogDB.query.filter_by(topic_name=topic.name,partition_index = topic.partition_index)
-                .order_by(LogDB.id)
-                .all()
-            )
-            for log in logs:
-                self._topics[(topic.name,topic.partition_index)].add_log(
-                    Log(log.producer_id, log.message, log.timestamp)
-                )
+            # get logs with topic_name=topic.name and ordered by their ids - deprecated
+            # no longer storing logs in memory
+            # logs = (
+            #     LogDB.query.filter_by(topic_name=topic.name,partition_index = topic.partition_index)
+            #     .order_by(LogDB.id)
+            #     .all()
+            # )
+            # for log in logs:
+            #     self._topics[(topic.name,topic.partition_index)].add_log(
+            #         Log(log.producer_id, log.message, log.timestamp)
+            #     )
 
     def _contains(self, topic_name: str, partition_index: int) -> bool:
         """Return whether the master queue contains the given topic."""
@@ -74,7 +76,7 @@ class MasterQueue:
         consumer_offset = self._topics[(topic_name,partition_index)].get_consumer_offset(consumer_id, partition_index)
         return {"partition_number": partition_index, "size": total_length - consumer_offset}
 
-    def get_log(self, topic_name: str, partition_index: int, consumer_id: str) -> Optional[Log]:
+    def get_log(self, topic_name: str, partition_index: int, consumer_id: str) -> str:
         """Return the log if consumer registered with topic and has a log
         available to pull."""
         current_length = self._topics[(topic_name, partition_index)].get_length()
@@ -96,9 +98,13 @@ class MasterQueue:
     def add_log(self, topic_name: str, partition_index:int, producer_id: str, message: str) -> None:
         """Add a log to the topic"""
         timestamp = time.time()
-        index = self._topics[(topic_name,partition_index)].add_log(
-            Log(producer_id, message, timestamp)
-        )
+
+        # no longer storing logs in memory
+        # index = self._topics[(topic_name,partition_index)].add_log(
+        #     Log(producer_id, message, timestamp)
+        # )
+
+        index = self._topics[(topic_name,partition_index)].increment_length()
 
         # add to db
         db.session.add(

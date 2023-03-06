@@ -125,7 +125,7 @@ def consume():
         log = master_queue.get_log(topic_name, partition_index, consumer_id)
         if log is not None:
             return make_response(
-                jsonify({"status": "success", "message": log.message, "partition_read": partition_index}), 200
+                jsonify({"status": "success", "message": log, "partition_read": partition_index}), 200
             )
         return make_response(
             jsonify(
@@ -134,7 +134,10 @@ def consume():
             200,
         )
     except Exception as e:
-        raise
+        return make_response(
+            jsonify({"status": "failure", "message": str(e)}),
+            400,
+        )
 
 
 @app.route(rule="/size", methods=["GET"])
