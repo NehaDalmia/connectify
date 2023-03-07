@@ -56,10 +56,10 @@ def health_check():
 from src import views
 
 with app.app_context():
-    # if app.config["TESTING"]:
-    #     print("\033[94mTesting mode detected \033[0m")
-    #     db.drop_all()
-    #     print("\033[94mAll tables dropped.\033[0m")
+    if app.config["TESTING"]:
+        print("\033[94mTesting mode detected \033[0m")
+        db.drop_all()
+        print("\033[94mAll tables dropped.\033[0m")
     
     print("\033[94mCreating all tables...\033[0m")
     db.create_all()
