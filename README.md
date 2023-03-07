@@ -1,7 +1,43 @@
 # Connectify : DS-Assignment-2
 
 ## Setup 
---> Rajat
+
+### Docker Compose
+In this system, each of the brokers, managers as well as the load balancer will all run inside a Docker container of their own (essentially as services).
+
+The Docker Compose file (`compose.yaml`) describes the configuration of the containers (services). Here's a description of the various services:
+- `gateway`: This is an nginx service which acts as a reverse proxy / load-balancer for read-managers and write-managers.
+    - Only this service is exposed via a port (8080) of the gateway of the network.
+- `primary_manager`: This is the write-manager service.
+    - Single service, unreplicated.
+- `readonly_manager`: This is the read-manager service(s).
+    - Several replicas.
+    - Replicated by Docker Compose by specifying number in the compose file itself.
+- `broker-[1..n]`: This is the broker service.
+    - Several in number.
+    - Added by mentioning `service` entries in the compose file (hard-coding). We choose this approach rather than Docker Compose replication as each broker uses a stores partitions in a separate database (having a different service name), so they are not exact replicas of each other.
+- `prime_datadb`: Metadata database.
+    - Single service, unreplicated.
+- `masterdb-[1..n]`: Master database per broker for writes
+    - Several in number. Each corresponding to a broker.
+- `slavedb-[1..n]`: Slave database per broker for reads.
+    - Several in number. Each corresponding to a broker.
+
+### Docker Networking
+- User-defined bridge network named `internal` (named `connectify_internal` when set up) is created by Docker Compose. All the services are a part of this network.
+- Services within this network can communicate with each other just by knowing each others' service names as the Docker daemon can do name resolution.
+- Service names are assumed to remain constant and standard, hence we have used them as hostnames in the code to send HTTP requests amongst each other as this is a more convenient safer way than using bare IP addresses.
+
+### How to Run
+- Run the Docker Compose file to set up the Docker services.
+```bash
+docker compose up --build
+```
+- Run the following command to find out the IP address of the gateway of our network.
+```bash
+docker network inspect connectify_internal | grep "Gateway"
+```
+- Let's say the IP address is `172.19.0.1`. Use either our client-side library or `curl` to submit requests to `172.19.0.1:8080`. 
 
 ## Design
 We implement a multi-broker distributed queue system which serves write and read requests from `producers` and `consumers` via a __client side library__. The queue manages `topics`, to which producers and consumers subscribe to. Upon a successful subscription, producers write logs to the queue which the registered consumers can read. All consumers have their own offset which maintains how many logs they have read from a given topic. In order to make our distributed queue scalable, each topic is broken into various`partitions`. These partitions are distributed accross various containers called `brokers`, each broker can have zero to many partitions of a given topic. The implementation of our design is discussed further in the following sections.
@@ -246,8 +282,8 @@ We run a separate thread in the `primary_manager` which on a timely interval pol
 
 
 ### Client Side Library
---> Rajat
 
+See [client side library README](./connectify_client/README.md).
 
 ## Optimisations 
 
