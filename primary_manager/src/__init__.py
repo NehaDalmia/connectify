@@ -3,6 +3,8 @@ from flask_sqlalchemy import SQLAlchemy
 import requests
 
 from src.json_validator import expects_json
+from src.async_requests import AsyncRequests
+from src.sync_utils import sync_broker_metadata
 from time import sleep
 import config
 import os
@@ -48,16 +50,16 @@ def health_check():
                         except Exception as e:
                             app.logger.warning(str(e))
                             
-            # check every 10 seconds
-            sleep(10)
+            # check every 1 second
+            sleep(1)
 
 from src import views
 
 with app.app_context():
-    if app.config["TESTING"]:
-        print("\033[94mTesting mode detected \033[0m")
-        db.drop_all()
-        print("\033[94mAll tables dropped.\033[0m")
+    # if app.config["TESTING"]:
+    #     print("\033[94mTesting mode detected \033[0m")
+    #     db.drop_all()
+    #     print("\033[94mAll tables dropped.\033[0m")
     
     print("\033[94mCreating all tables...\033[0m")
     db.create_all()

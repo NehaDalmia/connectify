@@ -125,7 +125,7 @@ def register_consumer(): # HEALTHCHECK
     try:
         consumer_id,partition_count = data_manager.add_consumer(topic_name)
         broker_hosts = data_manager.get_broker_list_for_topic(topic_name)
-        for i in range(len(broker_hosts)): # can async this
+        for i in range(len(broker_hosts)):
             if data_manager.broker_is_active(broker_hosts[i]):
                 try:
                     response = requests.post("http://"+broker_hosts[i]+":5000/consumer/register",json = {"topic":topic_name,"consumer_id":consumer_id,"partition_index":i})
@@ -230,6 +230,7 @@ def add_broker():
             requests.post(f"http://{project_name}-readonly_manager-{i+1}:5000/sync/broker/add", json = {
                 "broker_host":broker_host,
             })
+        # sync_broker_metadata("/sync/broker/add", broker_host) # ASYNC VERSION
 
     except Exception as e:
         return make_response(
@@ -266,6 +267,7 @@ def remove_broker():
             requests.post(f"http://{project_name}-readonly_manager-{i+1}:5000/sync/broker/remove", json = {
                 "broker_host":broker_host,
             })
+        # sync_broker_metadata("/sync/broker/remove", broker_host) # ASYNC VERSION
 
     except Exception as e:
         return make_response(

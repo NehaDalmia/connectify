@@ -8,6 +8,7 @@ import os
 from src.models import Topic
 from src import db, app
 from src import TopicDB, BrokerDB, ProducerDB, PartitionDB, ConsumerDB, RequestLogDB
+from src import sync_broker_metadata
 
 class DataManager:
     """
@@ -210,6 +211,7 @@ class DataManager:
                 requests.post(f"http://{project_name}-readonly_manager-{i+1}:5000/sync/broker/activate", json = {
                     "broker_host":broker_host,
                 })
+            # sync_broker_metadata("/sync/broker/activate", broker_host) # ASYNC VERSION
             # activate on write manager
             self._active_brokers[broker_host] = self._inactive_brokers[broker_host]
             self._inactive_brokers.pop(broker_host)
@@ -229,6 +231,7 @@ class DataManager:
                 requests.post(f"http://{project_name}-readonly_manager-{i+1}:5000/sync/broker/deactivate", json = {
                     "broker_host":broker_host,
                 })
+            # sync_broker_metadata("/sync/broker/deactivate", broker_host) # ASYNC VERSION
             # deactivate on write manager
             self._inactive_brokers[broker_host] = self._active_brokers[broker_host]
             self._active_brokers.pop(broker_host)
