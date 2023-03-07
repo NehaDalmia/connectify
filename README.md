@@ -19,8 +19,8 @@ The project consists of various components that interact with each other to serv
     - `POST` on `/producer/produce`
 - **Code Structure :**
     - __src__ - the directory containing the primary application with the in-memory datastructures, models and API support
-    - __datastructures__ - implementations for the various thread-safe datastructures used in the primary manager. For more details, check this [README](primary_manager/src/datastructures/README.md)
-    - __models__ - implementations for various concepts of the queue such as  `Topic`, and `Data_Manager` abstracted using classes. For more details, check this [README](primary_manager/src/models/README.md)
+    - __datastructures__ - implementations for the various thread-safe datastructures used in the primary manager.
+    - __models__ - implementations for various concepts of the queue such as  `Topic`, and `Data_Manager` abstracted using classes.
     - __views.py__ - the file containing the HTTP API endpoints for interacting with the primary manager.
     - __json_validator.py__ - the file containing the validator for validating the request JSON body based on the provided schema
     - __db_models__ - the directory containing the database models for programmatically interacting with the database using `SQLAlchemy`
@@ -36,8 +36,8 @@ The project consists of various components that interact with each other to serv
     - `POST` on `/sync/consumer/register`
 - **Code Structure :**
     - __src__ - the directory containing the primary application with the in-memory datastructures, models and API support
-    - __datastructures__ - implementations for the various thread-safe datastructures used in the read-only manager. For more details, check this [README](readonly_manager/src/datastructures/README.md)
-    - __models__ - implementations for various concepts of the queue such as  `Topic`,  `Readonly_Manager` and `Broker` abstracted using classes. For more details, check this [README](readonly_manager/src/models/README.md)
+    - __datastructures__ - implementations for the various thread-safe datastructures used in the read-only manager.
+    - __models__ - implementations for various concepts of the queue such as  `Topic`,  `Readonly_Manager` and `Broker` abstracted using classes.
     - __views.py__ - the file containing the HTTP API endpoints for interacting with the read-only manager.
     - __json_validator.py__ - the file containing the validator for validating the request JSON body based on the provided schema
     - __db_models__ - the directory containing the database models for programmatically interacting with the database using `SQLAlchemy`
@@ -52,8 +52,8 @@ The project consists of various components that interact with each other to serv
     - `POST` on `/producer/produce`
 - **Code Structure :**
     - __src__ - the directory containing the primary application with the in-memory datastructures, models and API support
-    - __datastructures__ - implementations for the various thread-safe datastructures used in the broker. For more details, check this [README](broker/src/datastructures/README.md)
-    - __models__ - implementations for various concepts of the queue such as  `Topic`,  `Master_Queue` and `Log` abstracted using classes. For more details, check this [README](broker/src/models/README.md)
+    - __datastructures__ - implementations for the various thread-safe datastructures used in the broker.
+    - __models__ - implementations for various concepts of the queue such as  `Topic`,  `Master_Queue` and `Log` abstracted using classes.
     - __views.py__ - the file containing the HTTP API endpoints for interacting with the broker.
     - __json_validator.py__ - the file containing the validator for validating the request JSON body based on the provided schema
     - __db_models__ - the directory containing the database models for programmatically interacting with the database using `SQLAlchemy`
@@ -67,7 +67,7 @@ We use `nginx` as a top level load balancer and a reverse proxy. All requests ar
 
 ##### Master Slave Architecture
 
---> Nisarg
+In our previous design we were maintaining the logs in memory to serve the read requests. However, this approach is not scalable. So instead we shifted to a master-slave architecture. Here, each broker has access to a write database (the MASTER) and multiple read databases (the SLAVES). All read requests are served from the read database. In order to do this we have used Postgres WAL Replication whereby WAL records are streamed to slaves and sync is maintained. Through this we ensure high data availability as well as lesser load on the write database.
 
 
 ### Database Schemas
@@ -97,6 +97,13 @@ This database is used to store all the __metadata__ associated with our distribu
 ###### Table `brokers` - contains the broker service names and their availability status
 - `name` - the primary key of the table, service name of the broker
 - `status` - stores whether the broker is alive or not
+
+###### Table `request_logs` - contains the logs of the requests to inactive brokers, to be replayed later
+- `id` - the primary key of the table, unique identifier of the log
+- `broker_name` - the name of the broker to which the request was made
+- `endpoint` - the endpoint of the request
+- `json_data` - the JSON body of the request
+
 
 ##### Master Database(s)
 These databases store the __actual queue data__ and the associated metadata required for the handling of this data. It does not store unnecessary queue metadata. Each master database has an associated broker. The database schema is as follows: 
@@ -233,9 +240,9 @@ These endpoints serve the purpose of synchronisation between the primary manager
 
 
 
-##### Healthcheck Endpoints
---> Nisarg 
+### Healthcheck Service
 
+We run a separate thread in the `primary_manager` which on a timely interval polls the registered brokers with a __GET on /__ (the root endpoint). We maintain a counter which counts down on each failure to connect with the broker. When the broker is unreachable even after 3 retries it is marked as deactivated. It no longer is used for assigning partitions to new topics. Produce and consume requests to it return failure. If a consumer does register to a topic which has partitions on a broker which is inactive then the requests to register that consumer to the inactive broker are queued. When the broker becomes active back again the queue is replayed and a consistent state is reached.
 
 
 ### Client Side Library
@@ -243,6 +250,22 @@ These endpoints serve the purpose of synchronisation between the primary manager
 
 
 ## Optimisations 
+
+### Async Requests
+We use the async requests module which we used in our client library to make simultaneous async queries from the write manager to the read managers. There are two advanatages of doing this:
+1. It takes less time than updating the read managers sequentially.
+2. The read managers get updated at more or less the same time with little disparity between their states.
+
+### Distributed Metadata
+Having all the metadata related to producers, consumers and topics stored in a single database would lead to a single point of failure. Instead our design ensures high availability of data even in case of temporary database failures. To do this we made the following design decisions:
+1. Each read manager has an in-memory copy of the relavant metadata. On any updates, the write manager sends requests to the read managers which then update their metadata. A downside of this approach is that if there is any failure in updating any read manager for whatever reason, the system is left in an inconsistent state.
+2. As we are not keeping a central metadata database some data which would require synchronisation between the read managers, like the consumer offsets are stored instead at the broker level. So that we don't have to worry about keeping them in sync at the read manager level.
+
+### Master-Slave
+We have a master database and one or more slave databases for each broker. All writes are done to the master database and the slave databases are updated asynchronously. Overall this design has the following advantages:
+1. The master database is always up to date and is not overloaded with read requests.
+2. The slave databases are updated asynchronously and are not overloaded with write requests.
+3. The slave databases are updated in the background and are not affected by any temporary failures in the master database ensuring high availability of data.
 
 
 ## Testing
@@ -264,7 +287,5 @@ Test the concurrent working of various consumer associated endpoints such as reg
 ##### Recovery Testing
 Test the recovery of the queue from a crash. Start a producer and a consumer. Kill the application. Start the application again. Check that the producer and consumer are able to interact with the queue as before. The producer should be able to produce logs and the consumer should be able to consume logs as long as the limit is not reached. Limit can be set by the `MESSAGES` parameter in the respective test files. This also tests the working of the producer and consumer in our client library as we it for creating the producer and consumer.
 
-##### Client Side Library Testing
---> Nisarg as done in assign1 
 ##### Performance Testing
---> Nisarg as done in assign1
+We tested both the performance of the queue and the library we provide. We used asyncio to make asynchronous requests to the queue using the library. With async consume calls we saw a 50% reduction in time taken to consume the logs. Also we saw a 30-40% improvement in the time taken to process multiple requests with threading enabled in the flask application.
