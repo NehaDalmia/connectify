@@ -51,11 +51,13 @@ class Producer:
     async def _produce(
         self,
         session: aiohttp.client.ClientSession,
-        topic_name: str,
         message: str,
+        topic_name: str,
+        partition_index: int = None
     ) -> Tuple[bool, str]:
         """
-        Produce a message to a topic.
+        Produce a message to a given partition of a topic. If no partition 
+        is provided, partition will be chosen in a round-robin manner.
         """
         if topic_name in self.topics:
             try:
@@ -65,6 +67,8 @@ class Producer:
                     "producer_id": self.topics[topic_name],
                     "message": message,
                 }
+                if partition_index is not None:
+                    json_data["partition_index"] = partition_index
                 async with session.post(url, json=json_data) as response:
                     response_status = response.status
                     response_json = await response.json()
@@ -93,7 +97,7 @@ class Producer:
         )[0]
 
     def produce_across_topics(
-        self, topics: List[str], message: str
+        self, message: str, topics: List[str]
     ) -> List[Tuple[bool, str]]:
         """
         Produce a message to multiple topics. 
@@ -111,12 +115,37 @@ class Producer:
         return self.async_requestor.run(
             self._produce,
             [
-                {"topic_name": topic_name, "message": message}
+                {"message": message, "topic_name": topic_name}
                 for topic_name in topics
-            ],
+            ]
+        )
+    
+    def produce_across_partitions_of_topic(
+        self, message: str, topic_name: str, partition_indices: List[str]
+    ) -> List[Tuple[bool,str]]:
+        """
+        Produce a message to multiple partitions of a given topic. 
+
+        Params:
+            topic_name - the name of the topic to produce to
+            partition_indices - the list of partitions to produce to
+            message - the message to produce
+        
+        Returns:
+            A list of tuples of (success, message)
+            There is a one-to-one correspondence between the `partition_indices` parameter
+            and the returned list. One tuple per partition_index indicating whether the 
+            message was produced successfully in that partition.
+        """
+        return self.async_requestor.run(
+            self._produce,
+            [
+                {"message": message, "topic_name": topic_name, "partition_index": partition_index}
+                for partition_index in partition_indices
+            ]
         )
 
-    def produce(self, topic_name: str, message: str) -> Tuple[bool, str]:
+    def produce(self, message: str, topic_name: str) -> Tuple[bool, str]:
         """
         Produce a message to a topic.
 
@@ -127,10 +156,24 @@ class Producer:
         Returns:
             A tuple of (success, message)
         """
-        return self.produce_across_topics([topic_name], message)[0]
+        return self.produce_across_topics(message, [topic_name])[0]
+    
+    def produce_to_partition(self, message: str, topic_name: str, partition_index: int) -> Tuple[bool,str]:
+        """
+        Produce a message to a given partition of a topic.
+
+        Params:
+            message - the message to produce
+            topic_name - the name of the topic to produce to
+            partition_index - the partition to be produced to
+
+        Returns:
+            A tuple of (success, message)
+        """
+        return self.produce_across_partitions_of_topic(message, topic_name, [partition_index])[0]
 
     def produce_multiple_messages(
-        self, topic_name: str, messages: List[str]
+        self,  messages: List[str], topic_name: str
     ) -> List[Tuple[bool, str]]:
         """
         Produce multiple messages to a topic. 
@@ -141,17 +184,39 @@ class Producer:
         
         Returns:
             A list of tuples of (success, message)
-            
-        
         
         Note: Does not guarantee order.
         """
         return self.async_requestor.run(
             self._produce,
             [
-                {"topic_name": topic_name, "message": message}
+                {"message": message, "topic_name": topic_name}
                 for message in messages
-            ],
+            ]
+        )
+    
+    def produce_multiple_messages_to_partition(
+        self, messages: List[str], topic_name: str, partition_index: int
+    ) -> List[Tuple[bool, str]]:
+        """
+        Produce multiple messages to a topic. 
+
+        Params:
+            messages - the list of messages to produce
+            topic_name - the name of the topic to produce to
+            partition_index - the partition to produce to
+        
+        Returns:
+            A list of tuples of (success, message)
+        
+        Note: Does not guarantee order.
+        """
+        return self.async_requestor.run(
+            self._produce,
+            [
+                {"message": message, "topic_name": topic_name, "partition_index": partition_index}
+                for message in messages
+            ]
         )
 
     def close(self) -> None:

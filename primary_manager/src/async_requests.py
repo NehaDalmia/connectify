@@ -28,7 +28,7 @@ class AsyncRequests:
         self,
         func: Callable[..., Awaitable[T]],
         reqs: List[Dict[str, Any]],
-        resp_dict: dict[int, T],
+        resp_dict: Dict[int, T],
     ) -> None:
         n = len(reqs)
 
@@ -49,10 +49,16 @@ class AsyncRequests:
         self, func: Callable[..., Awaitable[T]], reqs: List[Dict[str, Any]]
     ) -> List[T]:
         resp_dict: Dict[int, T] = {}
-        loop = asyncio.get_event_loop()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         loop.run_until_complete(
-            self.gather_with_concurrency(func, reqs, resp_dict)
+            asyncio.wait(
+                [
+                    asyncio.ensure_future(self.gather_with_concurrency(func, reqs, resp_dict))
+                ]
+            )
         )
+        loop.close()
         return [resp_dict[id] for id in range(len(reqs))]
     
     def close(self) -> None:

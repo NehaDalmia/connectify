@@ -1,4 +1,4 @@
-from src import app,os
+from src import app, os
 
 if __name__ == "__main__":
     print(os.environ["HOSTNAME"])

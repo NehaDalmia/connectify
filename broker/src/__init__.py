@@ -6,8 +6,13 @@ import config
 import os
 
 app = Flask(__name__)
-app.config.from_object(config.ProdConfig)
+app.config.from_object(config.DevConfig)
 db = SQLAlchemy(app)
+read_engine = None
+def execute_read_query(query, params = None):
+    global read_engine
+    return db.session.execute(query, params, bind=read_engine)
+
 from db_models import *
 
 from src.models import MasterQueue
@@ -17,6 +22,9 @@ master_queue = MasterQueue()
 from src import views
 
 with app.app_context():
+    # support for read queries
+    read_engine = db.get_engine('read')
+    
     if app.config["TESTING"]:
         print("\033[94mTesting mode detected. Dropping all tables...\033[0m")
         db.drop_all()
