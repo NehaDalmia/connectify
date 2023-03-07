@@ -2,7 +2,7 @@ from flask import make_response, request, jsonify
 from flask_expects_json import expects_json
 from jsonschema import ValidationError
 
-from src import app, expects_json, data_manager,os
+from src import app, expects_json, data_manager, os, RequestLogDB
 import requests
 
 @app.errorhandler(400)
@@ -26,7 +26,7 @@ def bad_request(error):
         "required": ["name"],
     }
 )
-def topics():
+def topics(): # HEALTHCHECK
     """Add a topic."""
 
     # If method is POST add a topic
@@ -40,7 +40,15 @@ def topics():
             else: 
                 broker_hosts = data_manager.add_topic_and_return(topic_name)
             for i in range(len(broker_hosts)):
-                response = requests.post("http://"+broker_hosts[i]+":5000/topics",json = {"name":topic_name,"partition_index":i})                
+                if data_manager.broker_is_active(broker_hosts[i]):
+                    try:
+                        response = requests.post("http://"+broker_hosts[i]+":5000/topics",json = {"name":topic_name,"partition_index":i})
+                    except Exception as e:
+                        app.logger.info(f"Unable to create topic {topic_name} on broker {broker_hosts[i]}, queueing for later")
+                        data_manager.queue_request(broker_hosts[i], "http://"+broker_hosts[i]+":5000/topics", {"name":topic_name,"partition_index":i})
+                else:
+                    app.logger.info(f"Unable to create topic {topic_name} on broker {broker_hosts[i]}, queueing for later")
+                    data_manager.queue_request(broker_hosts[i], "http://"+broker_hosts[i]+":5000/topics", {"name":topic_name,"partition_index":i})                
             
             # send updates to brokers
             read_only_count = int(os.environ["READ_REPLICAS"])
@@ -110,7 +118,7 @@ def register_producer():
         "required": ["topic"],
     }
 )
-def register_consumer():
+def register_consumer(): # HEALTHCHECK
     """Register a consumer for a topic."""
     topic_name = request.get_json()["topic"]
 
@@ -118,13 +126,15 @@ def register_consumer():
         consumer_id,partition_count = data_manager.add_consumer(topic_name)
         broker_hosts = data_manager.get_broker_list_for_topic(topic_name)
         for i in range(len(broker_hosts)): # can async this
-            response = requests.post(
-                "http://"+broker_hosts[i]+":5000/consumer/register",
-                json = {
-                    "topic":topic_name,
-                    "consumer_id":consumer_id,
-                    "partition_index":i
-                    })
+            if data_manager.broker_is_active(broker_hosts[i]):
+                try:
+                    response = requests.post("http://"+broker_hosts[i]+":5000/consumer/register",json = {"topic":topic_name,"consumer_id":consumer_id,"partition_index":i})
+                except Exception as e:
+                    app.logger.warning(f"Unable to register consumer {consumer_id} on broker {broker_hosts[i]}, queueing for later")
+                    data_manager.queue_request(broker_hosts[i], "http://"+broker_hosts[i]+":5000/consumer/register", {"topic":topic_name,"consumer_id":consumer_id,"partition_index":i})
+            else:
+                app.logger.warning(f"Unable to register consumer {consumer_id} on broker {broker_hosts[i]}, queueing for later")
+                data_manager.queue_request(broker_hosts[i], "http://"+broker_hosts[i]+":5000/consumer/register", {"topic":topic_name,"consumer_id":consumer_id,"partition_index":i})
         read_only_count = int(os.environ["READ_REPLICAS"])
         project_name = os.environ["COMPOSE_PROJECT_NAME"]
         for i in range(read_only_count): #async
@@ -159,7 +169,7 @@ def register_consumer():
         "required": ["topic", "producer_id", "message"],
     }
 )
-def produce():
+def produce(): # HEALTHCHECK
     """Add a log to a topic."""
     topic_name = request.get_json()["topic"]
     producer_id = request.get_json()["producer_id"]
@@ -170,13 +180,16 @@ def produce():
             partition_index = request.get_json()["partition_index"]
         
         broker_host, partition_index = data_manager.get_broker_host(topic_name, producer_id, partition_index)
-        response =  requests.post(
-            "http://"+broker_host+":5000/producer/produce",
-            json = {
-                "topic":topic_name, 
-                "producer_id":producer_id,
-                "message":message,
-                "partition_index":partition_index})
+        try:
+            response = requests.post(
+                "http://"+broker_host+":5000/producer/produce",
+                json = {
+                    "topic":topic_name, 
+                    "producer_id":producer_id,
+                    "message":message,
+                    "partition_index":partition_index})
+        except Exception as e:
+            raise Exception(f"Unable to produce message on broker {broker_host}")
         
         return make_response( 
             jsonify({"status": "success"}),
@@ -282,13 +295,6 @@ def activate_broker():
         )
     try:
         data_manager.activate_broker(broker_host)
-        read_only_count = int(os.environ["READ_REPLICAS"])
-        project_name = os.environ["COMPOSE_PROJECT_NAME"]
-        for i in range(read_only_count): #async
-            requests.post(f"http://{project_name}-readonly_manager-{i+1}:5000/sync/broker/activate", json = {
-                "broker_host":broker_host,
-            })
-
     except Exception as e:
         return make_response(
             jsonify({"status": "failure", "message": str(e)}), 400
@@ -317,13 +323,6 @@ def deactivate_broker():
         )
     try:
         data_manager.deactivate_broker(broker_host)
-        read_only_count = int(os.environ["READ_REPLICAS"])
-        project_name = os.environ["COMPOSE_PROJECT_NAME"]
-        for i in range(read_only_count): #async
-            requests.post(f"http://{project_name}-readonly_manager-{i+1}:5000/sync/broker/deactivate", json = {
-                "broker_host":broker_host,
-            })
-
     except Exception as e:
         return make_response(
             jsonify({"status": "failure", "message": str(e)}), 400
