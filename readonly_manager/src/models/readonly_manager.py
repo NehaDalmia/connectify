@@ -164,3 +164,7 @@ class ReadonlyManager:
                 raise Exception("Broker with hostname not active.")
             self._inactive_brokers.add(broker_host)
             self._active_brokers.remove(broker_host)
+    
+    def broker_is_active(self, broker_host) -> bool: 
+        with self._lock:
+            return broker_host in self._active_brokers

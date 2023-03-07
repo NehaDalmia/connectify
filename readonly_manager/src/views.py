@@ -45,7 +45,7 @@ def topics():
         "required": ["topic", "consumer_id"],
     }
 )
-def consume():
+def consume(): # HEALTHCHECK
     """Sanity check and assign consume request to a broker"""
     topic_name = request.get_json()["topic"]
     consumer_id = request.get_json()["consumer_id"]
@@ -74,6 +74,7 @@ def consume():
         num_tries = 0
         response = None
         success = False
+        found_active_broker = False
         num_partitions = ro_manager.get_partition_count(topic_name)
         # Try all brokers once, and infer no logs to read only if all brokers say so
         while num_tries < num_partitions:
@@ -82,26 +83,38 @@ def consume():
             json_data = request.get_json()
             json_data["partition_index"] = partition_index
             # Forward this request to a broker, wait for a response
-            response = requests.get(
-                url = "http://"+broker_host+":5000/consumer/consume",
-                json = json_data
-            )
-            # Check response received from broker, if success, then exit loop
-            if(response.json()["status"] == "success"):
-                success = True
-                break
+            if ro_manager.broker_is_active(broker_host):
+                try:
+                    response = requests.get(
+                        url = "http://"+broker_host+":5000/consumer/consume",
+                        json = json_data
+                    )
+                    # Check response received from broker, if success, then exit loop
+                    if(response.json()["status"] == "success"):
+                        success = True
+                        found_active_broker = True
+                        break
+                    found_active_broker = True
+                except Exception as e:
+                    # Broker is not active, try next broker
+                    pass
             num_tries += 1
             partition_index = (partition_index + 1) % num_partitions
             # If consumer wanted to read from given partition only, then exit loop
             if read_from_given_partition == True and num_tries == 1:
                 break
         # Reply to consumer
-        response_dict = {"status": response.json()["status"], "message": response.json()["message"]}
-        if success:
-           response_dict["partition_read"] = response.json()["partition_read"] 
-        return make_response(
-            jsonify(response_dict), 200
-        )
+        if found_active_broker:
+            response_dict = {"status": response.json()["status"], "message": response.json()["message"]}
+            if success:
+                response_dict["partition_read"] = response.json()["partition_read"] 
+            return make_response(
+                jsonify(response_dict), 200
+            )
+        else:
+            return make_response(
+                jsonify({"status": "failure", "message": "No active brokers found"}), 400
+            )
     except Exception as e:
         return make_response(
             jsonify({"status": "failure", "message": str(e)}), 400
@@ -119,7 +132,7 @@ def consume():
         "required": ["topic", "consumer_id"]
     }
 )
-def size():
+def size(): # HEALTHCHECK
     """Sanity check and assign size request to a broker."""
     topic_name = request.get_json()["topic"]
     consumer_id = request.get_json()["consumer_id"]
@@ -145,17 +158,28 @@ def size():
         # Contact each broker that contains partitions of the given topic. If
         # partition number is given only that broker that contains the partition
         # is contacted.
+        success = False
         for broker_host in ro_manager.get_broker_host(topic_name, partition_index):
             # Forward this request to the broker, wait for a response
-            response = requests.get(
-                url = "http://"+broker_host+":5000/size",
-                json = request.get_json()
-            )
-            sizes.extend(list(response.json()["sizes"]))
+            if ro_manager.broker_is_active(broker_host):
+                try:
+                    response = requests.get(
+                        url = "http://"+broker_host+":5000/size",
+                        json = request.get_json()
+                    )
+                    sizes.extend(list(response.json()["sizes"]))
+                    success = True
+                except Exception as e:
+                    pass
         # Reply to consumer
-        return make_response(
-            jsonify({"status": response.json()["status"], "sizes": sizes}), 200
-        )
+        if success:
+            return make_response(
+                jsonify({"status": "success", "sizes": sizes}), 200
+            )
+        else:
+            return make_response(
+                jsonify({"status": "failure", "message": "No brokers available"}), 400
+            )
     except Exception as e:
         return make_response(
             jsonify({"status": "failure", "message": str(e)}), 400
