@@ -3,10 +3,11 @@ from typing import Dict, List, Any, Tuple
 import uuid
 import time
 import requests
+import os
 
 from src.models import Topic
-from src import db
-from src import TopicDB, BrokerDB, ProducerDB, PartitionDB, ConsumerDB
+from src import db, app
+from src import TopicDB, BrokerDB, ProducerDB, PartitionDB, ConsumerDB, RequestLogDB
 
 class DataManager:
     """
@@ -74,7 +75,26 @@ class DataManager:
             if old_health != -3:
                 self._broker_health[broker_name] -= 1
         return old_health
+
+    
+    def broker_is_active(self, broker_name) -> bool:
+        """Return whether the broker is active."""
+        with self._lock:
+            return broker_name in self._active_brokers
         
+    def queue_request(self, broker_name: str, endpoint: str, json_data: Dict[str, Any]) -> None:
+        """Queue the request in the db."""
+        db.session.add(RequestLogDB(broker_name=broker_name, endpoint=endpoint, json_data=json_data))
+        db.session.commit()
+
+    def play_requests(self, broker_name: str) -> None:
+        """Play the requests in the db and delete them from database."""
+        app.logger.info(f"Playing requests for broker: {broker_name}")
+        pending_requests = RequestLogDB.query.filter_by(broker_name=broker_name).order_by(RequestLogDB.id).all()
+        for request in pending_requests:
+            requests.post(request.endpoint, json=request.json_data)
+            db.session.delete(request)
+        db.session.commit()
 
     def _contains(self, topic_name: str) -> bool:
         """Return whether the master queue contains the given topic."""
@@ -133,11 +153,21 @@ class DataManager:
         
         broker_index = partition_number
         if partition_number is None:
-            return self._topics[topic_name].round_robin_return_and_update_partition_index(producer_id)
+            retries = self._topics[topic_name].get_partition_count()
+            while retries > 0:
+                broker_host, partition_index = self._topics[topic_name].round_robin_return_and_update_partition_index(producer_id)
+                if self.broker_is_active(broker_host):
+                    return broker_host, partition_index
+                retries -= 1
+            raise Exception("All brokers are inactive.")
         else:
             if self._topics[topic_name].get_partition_count() <= partition_number :
                 raise Exception("Invalid Partition Number.")
-            return  self._topics[topic_name].update_partition_index(producer_id, partition_number)
+            broker_host, partition_index = self._topics[topic_name].update_partition_index(producer_id, partition_number)
+            if self.broker_is_active(broker_host):
+                return broker_host, partition_index
+            else:
+                raise Exception("Broker is inactive.")
     
     def get_broker_list_for_topic(self, topic_name:str) -> List[str]:
         return self._topics[topic_name].get_broker_list()
@@ -167,6 +197,20 @@ class DataManager:
         with self._lock:
             if ( broker_host not in self._inactive_brokers ): 
                 raise Exception("Broker with hostname not inactive.")
+            
+            try:
+                self.play_requests(broker_host)
+            except Exception as e:
+                raise Exception(f"Unable to play requests for broker {broker_host} : {e}")
+
+            # activate on read only managers
+            read_only_count = int(os.environ["READ_REPLICAS"])
+            project_name = os.environ["COMPOSE_PROJECT_NAME"]
+            for i in range(read_only_count): #async
+                requests.post(f"http://{project_name}-readonly_manager-{i+1}:5000/sync/broker/activate", json = {
+                    "broker_host":broker_host,
+                })
+            # activate on write manager
             self._active_brokers[broker_host] = self._inactive_brokers[broker_host]
             self._inactive_brokers.pop(broker_host)
             broker = BrokerDB.query.filter_by(name = broker_host).first()
@@ -177,6 +221,15 @@ class DataManager:
         with self._lock:
             if ( broker_host not in self._active_brokers ): 
                 raise Exception("Broker with hostname not active.")
+
+            # deactivate on read only managers
+            read_only_count = int(os.environ["READ_REPLICAS"])
+            project_name = os.environ["COMPOSE_PROJECT_NAME"]
+            for i in range(read_only_count): #async
+                requests.post(f"http://{project_name}-readonly_manager-{i+1}:5000/sync/broker/deactivate", json = {
+                    "broker_host":broker_host,
+                })
+            # deactivate on write manager
             self._inactive_brokers[broker_host] = self._active_brokers[broker_host]
             self._active_brokers.pop(broker_host)
             broker = BrokerDB.query.filter_by(name = broker_host).first()
