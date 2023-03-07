@@ -16,8 +16,12 @@ class DataManager:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._topics: Dict[str, Topic] = {}
-        self._brokers: Dict[str, int] = {}
+        self._active_brokers: Dict[str, int] = {}
         self._inactive_brokers : Dict[str,int] = {}
+        # broker health - 0 means healthy, for every failue
+        # increment by 1, when counter reaches -3, mark broker
+        # as inactive
+        self._broker_health : Dict[str, int] = {}
 
 
     def init_from_db(self) -> None:
@@ -35,18 +39,41 @@ class DataManager:
     
         brokers = BrokerDB.query.all()
         for broker in brokers:
+            self._broker_health[broker.name] = 0
             if broker.status == 1:
-                self._brokers[broker.name] = 0
+                self._active_brokers[broker.name] = 0
             else :
                 self._inactive_brokers[broker.name] = 0
             
         partitions = PartitionDB.query.order_by(PartitionDB.ind).all()
         for partition in partitions:
             self._topics[partition.topic_name].append_broker(partition.broker_host)
-            if partition.broker_host in self._brokers:
-                self._brokers[partition.broker_host]+=1
+            if partition.broker_host in self._active_brokers:
+                self._active_brokers[partition.broker_host]+=1
             else :
                 self._inactive_brokers[partition.broker_host]+=1
+    
+    def get_brokers(self) -> List[str]:
+        """Return the complete list of brokers."""
+        with self._lock:
+            return list(self._broker_health.keys())
+        
+    
+    def reset_broker_health(self, broker_name) -> int:
+        """Reset broker health to 0 and return old health"""
+        with self._lock:
+            old_health = self._broker_health[broker_name]
+            self._broker_health[broker_name] = 0
+        return old_health
+                
+    
+    def decrement_broker_health(self, broker_name) -> int:
+        """Decrement broker health by 1 and return old health"""
+        with self._lock:
+            old_health = self._broker_health[broker_name]
+            if old_health != -3:
+                self._broker_health[broker_name] -= 1
+        return old_health
         
 
     def _contains(self, topic_name: str) -> bool:
@@ -62,8 +89,8 @@ class DataManager:
                 raise Exception("Topic already exists.")
             self._topics[topic_name] = Topic(topic_name, num_partitions)
             for i in range(num_partitions) : 
-                min_partition_broker = min(self._brokers, key=self._brokers.get)
-                self._brokers[min_partition_broker]+=1
+                min_partition_broker = min(self._active_brokers, key=self._active_brokers.get)
+                self._active_brokers[min_partition_broker]+=1
                 broker_hosts.append(min_partition_broker)
                 self._topics[topic_name].append_broker(broker_hosts[i])
             db.session.add(TopicDB(name=topic_name, partitions = num_partitions))
@@ -117,20 +144,22 @@ class DataManager:
     
     def add_broker(self, broker_host) -> None: 
         with self._lock:
-            if ( broker_host in self._brokers ) or ( broker_host in self._inactive_brokers ) : 
+            if ( broker_host in self._active_brokers ) or ( broker_host in self._inactive_brokers ) : 
                 raise Exception("Broker with hostname already exists.")
-            self._brokers[broker_host] = 0
+            self._active_brokers[broker_host] = 0
+            self._broker_health[broker_host] = 0
             db.session.add(BrokerDB(name = broker_host,status = 1))
             db.session.commit()
     
     def remove_broker(self, broker_host) -> None: 
         with self._lock:
-            if ( broker_host not in self._brokers ) and ( broker_host not in self._inactive_brokers ) : 
+            if ( broker_host not in self._active_brokers ) and ( broker_host not in self._inactive_brokers ) : 
                 raise Exception("Broker with hostname not present.")
-            if broker_host in self._brokers :
-                self._brokers.pop(broker_host)
+            if broker_host in self._active_brokers :
+                self._active_brokers.pop(broker_host)
             else :
                 self._inactive_brokers.pop(broker_host)
+            self._broker_health.pop(broker_host)
             BrokerDB.query.filter_by(name = broker_host).delete()
             db.session.commit()
     
@@ -138,7 +167,7 @@ class DataManager:
         with self._lock:
             if ( broker_host not in self._inactive_brokers ): 
                 raise Exception("Broker with hostname not inactive.")
-            self._brokers[broker_host] = self._inactive_brokers[broker_host]
+            self._active_brokers[broker_host] = self._inactive_brokers[broker_host]
             self._inactive_brokers.pop(broker_host)
             broker = BrokerDB.query.filter_by(name = broker_host).first()
             broker.status = 1
@@ -146,18 +175,10 @@ class DataManager:
 
     def deactivate_broker(self, broker_host) -> None: 
         with self._lock:
-            if ( broker_host not in self._brokers ): 
+            if ( broker_host not in self._active_brokers ): 
                 raise Exception("Broker with hostname not active.")
-            self._inactive_brokers[broker_host] = self._brokers[broker_host]
-            self._brokers.pop(broker_host)
+            self._inactive_brokers[broker_host] = self._active_brokers[broker_host]
+            self._active_brokers.pop(broker_host)
             broker = BrokerDB.query.filter_by(name = broker_host).first()
             broker.status = 0
             db.session.commit()
-
-        
-
-        
-       
-    
-        
-
