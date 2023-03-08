@@ -120,7 +120,6 @@ class Consumer:
         Params:
             n - the number of messages to consume
             topic_name - the name of the topic to consume from
-            partition_index
         
         Returns:
             A list of tuples of (success, message).
@@ -251,8 +250,8 @@ class Consumer:
         Returns:
             True if there is at least one unconsumed message in the queue.
         """
-        success, message = self.get_queue_length(topic_name)
-        return success and int(message) > 0
+        success, list = self.get_queue_length(topic_name)
+        return success and sum(dict["size"] for dict in list) > 0
 
     def close(self) -> None:
         """
