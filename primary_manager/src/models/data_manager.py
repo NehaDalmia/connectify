@@ -205,13 +205,15 @@ class DataManager:
                 raise Exception(f"Unable to play requests for broker {broker_host} : {e}")
 
             # activate on read only managers
-            read_only_count = int(os.environ["READ_REPLICAS"])
-            project_name = os.environ["COMPOSE_PROJECT_NAME"]
-            for i in range(read_only_count): #async
-                requests.post(f"http://{project_name}-readonly_manager-{i+1}:5000/sync/broker/activate", json = {
-                    "broker_host":broker_host,
-                })
-            # sync_broker_metadata("/sync/broker/activate", broker_host) # ASYNC VERSION
+            # read_only_count = int(os.environ["READ_REPLICAS"])
+            # project_name = os.environ["COMPOSE_PROJECT_NAME"]
+            # for i in range(read_only_count): #async
+            #     requests.post(f"http://{project_name}-readonly_manager-{i+1}:5000/sync/broker/activate", json = {
+            #         "broker_host":broker_host,
+            #     })
+            sync_broker_metadata("/sync/broker/activate", {
+                "broker_host":broker_host,
+            })
             # activate on write manager
             self._active_brokers[broker_host] = self._inactive_brokers[broker_host]
             self._inactive_brokers.pop(broker_host)
@@ -225,13 +227,18 @@ class DataManager:
                 raise Exception("Broker with hostname not active.")
 
             # deactivate on read only managers
-            read_only_count = int(os.environ["READ_REPLICAS"])
-            project_name = os.environ["COMPOSE_PROJECT_NAME"]
-            for i in range(read_only_count): #async
-                requests.post(f"http://{project_name}-readonly_manager-{i+1}:5000/sync/broker/deactivate", json = {
+            # read_only_count = int(os.environ["READ_REPLICAS"])
+            # project_name = os.environ["COMPOSE_PROJECT_NAME"]
+            # for i in range(read_only_count): #async
+            #     requests.post(f"http://{project_name}-readonly_manager-{i+1}:5000/sync/broker/deactivate", json = {
+            #         "broker_host":broker_host,
+            #     })
+            sync_broker_metadata(
+                "/sync/broker/deactivate", 
+                {
                     "broker_host":broker_host,
-                })
-            # sync_broker_metadata("/sync/broker/deactivate", broker_host) # ASYNC VERSION
+                }
+            )
             # deactivate on write manager
             self._inactive_brokers[broker_host] = self._active_brokers[broker_host]
             self._active_brokers.pop(broker_host)
